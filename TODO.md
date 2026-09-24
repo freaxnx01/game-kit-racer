@@ -1,9 +1,9 @@
 # TODO
 
-## In progress: OSM surroundings
+## Done: OSM surroundings (2026-09-24)
 
-Design approved 2026-09-24 → `docs/superpowers/specs/2026-09-24-osm-surroundings-design.md`
-(awaiting spec review, then implementation plan). Closes #2.
+Spec `docs/superpowers/specs/2026-09-24-osm-surroundings-design.md`, plan
+`docs/superpowers/plans/2026-09-24-osm-surroundings.md`. Awaiting the user's Sisseln play-test.
 
 ## Discoveries (not acted on)
 
