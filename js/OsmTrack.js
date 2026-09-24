@@ -38,8 +38,28 @@ function defaultStorage() {
 
 }
 
-// Same query → same data: answers are cached in storage (localStorage by default, null = no cache)
-// so a flaky Overpass only has to answer once. onTry( host ) is called before each mirror.
+// Keeps a single cached answer: every other CACHE_PREFIX key is removed first, so the cache never
+// crowds out other saves on a shared origin. Uses only standard Storage methods.
+function storeOnly( storage, key, value ) {
+
+	if ( ! storage ) return;
+
+	const stale = [];
+
+	for ( let i = 0; i < storage.length; i ++ ) {
+
+		const k = storage.key( i );
+		if ( k !== null && k !== key && k.startsWith( CACHE_PREFIX ) ) stale.push( k );
+
+	}
+
+	for ( const k of stale ) storage.removeItem( k );
+	storage.setItem( key, value );
+
+}
+
+// Same query → same data: the latest answer is cached in storage (localStorage by default, null =
+// no cache) so a flaky Overpass only has to answer once. onTry( host ) is called before each mirror.
 // Resolves { osm, source }; rejects with every mirror's error when all fail.
 export async function fetchOverpass( query, { storage = defaultStorage(), fetchImpl = globalThis.fetch, timeoutMs = 45000, onTry = () => {} } = {} ) {
 
@@ -70,7 +90,7 @@ export async function fetchOverpass( query, { storage = defaultStorage(), fetchI
 			if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
 			if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
 
-			try { storage?.setItem( key, JSON.stringify( osm ) ); } catch {}
+			try { storeOnly( storage, key, JSON.stringify( osm ) ); } catch {}
 
 			return { osm, source: host };
 

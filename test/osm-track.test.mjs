@@ -9,10 +9,22 @@ import {
 
 const fixture = JSON.parse( fs.readFileSync( new URL( './fixtures/sisseln.json', import.meta.url ) ) );
 
+// In-memory stand-in for the Web Storage API (length, key, getItem, setItem, removeItem).
 const memoryStorage = () => {
 
 	const m = new Map();
-	return { getItem: ( k ) => m.get( k ) ?? null, setItem: ( k, v ) => m.set( k, v ), size: () => m.size };
+	return {
+		get length() {
+
+			return m.size;
+
+		},
+		key: ( i ) => [ ...m.keys() ][ i ] ?? null,
+		getItem: ( k ) => m.get( k ) ?? null,
+		setItem: ( k, v ) => m.set( k, String( v ) ),
+		removeItem: ( k ) => m.delete( k ),
+		size: () => m.size,
+	};
 
 };
 
@@ -54,6 +66,24 @@ test( 'fetchOverpass_firstMirrorDown_usesNextAndCaches', async () => {
 	assert.equal( source, new URL( OVERPASS_MIRRORS[ 1 ] ).host );
 	assert.equal( tried.length, 2 );
 	assert.equal( storage.size(), 1 );
+
+} );
+
+test( 'fetchOverpass_newAnswer_evictsOtherCachedQueriesOnly', async () => {
+
+	const storage = memoryStorage();
+	storage.setItem( 'osm-track.cache.OLD1', JSON.stringify( { elements: [ 1 ] } ) );
+	storage.setItem( 'racing.bestLap.x', '42.1' );
+	storage.setItem( 'osm-track.cache.OLD2', JSON.stringify( { elements: [ 2 ] } ) );
+	storage.setItem( 'gg-lang', 'de' );
+	const fetchImpl = async () => okResponse( { elements: [ 3 ] } );
+	await fetchOverpass( 'Q', { storage, fetchImpl } );
+	assert.equal( storage.getItem( 'osm-track.cache.OLD1' ), null );
+	assert.equal( storage.getItem( 'osm-track.cache.OLD2' ), null );
+	assert.equal( storage.getItem( 'osm-track.cache.Q' ), JSON.stringify( { elements: [ 3 ] } ) );
+	assert.equal( storage.getItem( 'racing.bestLap.x' ), '42.1' );
+	assert.equal( storage.getItem( 'gg-lang' ), 'de' );
+	assert.equal( storage.length, 3 );
 
 } );
 
