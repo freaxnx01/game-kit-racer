@@ -32,6 +32,9 @@ export const OVERPASS_MIRRORS = [
 
 const CACHE_PREFIX = 'osm-track.cache.';
 
+// Overpass answers HTTP 200 with a truncated result and a remark like "runtime error: Query timed out".
+const PARTIAL_REMARK = /error|timed out|timeout/i;
+
 function defaultStorage() {
 
 	try { return globalThis.localStorage ?? null; } catch { return null; }
@@ -88,6 +91,7 @@ export async function fetchOverpass( query, { storage = defaultStorage(), fetchI
 			if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
 			const osm = await res.json();
 			if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
+			if ( PARTIAL_REMARK.test( osm.remark ?? '' ) ) throw new Error( osm.remark );
 			if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
 
 			try { storeOnly( storage, key, JSON.stringify( osm ) ); } catch {}

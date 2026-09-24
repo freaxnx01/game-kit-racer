@@ -87,6 +87,27 @@ test( 'fetchOverpass_newAnswer_evictsOtherCachedQueriesOnly', async () => {
 
 } );
 
+test( 'fetchOverpass_remarkReportsTimeout_triesNextMirrorAndCachesOnlyThat', async () => {
+
+	const storage = memoryStorage();
+	const partial = { elements: [ 1 ], remark: 'runtime error: Query timed out in "query" at line 1 after 61 seconds.' };
+	const fetchImpl = async ( url ) => okResponse( url === OVERPASS_MIRRORS[ 0 ] ? partial : { elements: [ 1, 2 ] } );
+	const { osm, source } = await fetchOverpass( 'Q', { storage, fetchImpl } );
+	assert.equal( source, new URL( OVERPASS_MIRRORS[ 1 ] ).host );
+	assert.deepEqual( osm, { elements: [ 1, 2 ] } );
+	assert.equal( storage.getItem( 'osm-track.cache.Q' ), JSON.stringify( { elements: [ 1, 2 ] } ) );
+
+} );
+
+test( 'fetchOverpass_everyAnswerPartial_rejectsAndCachesNothing', async () => {
+
+	const storage = memoryStorage();
+	const fetchImpl = async () => okResponse( { elements: [ 1 ], remark: 'runtime error: out of memory' } );
+	await assert.rejects( fetchOverpass( 'Q', { storage, fetchImpl } ), /runtime error/ );
+	assert.equal( storage.length, 0 );
+
+} );
+
 test( 'fetchOverpass_allMirrorsFail_rejectsWithEveryError', async () => {
 
 	const fetchImpl = async () => ( { ok: false, status: 504 } );
