@@ -118,9 +118,9 @@
 		// Version badge → CHANGELOG. Text comes only from window.GAME_VERSION so
 		// version.js stays the single source (never hardcode the literal here).
 		( function () {
-			var el = document.getElementById( 'version-badge' );
+			const el = document.getElementById( 'version-badge' );
 			if ( ! el ) return;
-			var a = document.createElement( 'a' );
+			const a = document.createElement( 'a' );
 			a.href = 'https://github.com/freaxnx01/game-kit-racer/blob/main/CHANGELOG.md';
 			a.target = '_blank'; a.rel = 'noopener'; a.title = 'Changelog';
 			a.textContent = 'v' + ( window.GAME_VERSION || '0.0.0' );

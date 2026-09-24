@@ -17,9 +17,12 @@ const MODE = 'L';
 const html = SOURCE.startsWith( 'http' ) ? await ( await fetch( SOURCE ) ).text() : fs.readFileSync( SOURCE, 'utf8' );
 const start = html.indexOf( 'get TRACKS() { return ' );
 if ( start < 0 ) throw new Error( 'TRACKS definition not found in ' + SOURCE );
-const body = html.slice( start + 'get TRACKS() { return '.length, html.indexOf( 'buildTrack(idx)', start ) );
-// Evaluates the TRACKS literal from the page — only point this at a source you trust.
-const TRACKS = new Function( 'return ' + body.slice( 0, body.lastIndexOf( ']' ) + 1 ) )();
+const body = html.slice( start, html.indexOf( 'buildTrack(idx)', start ) );
+
+// Parse only what we need (id, name, desc, numeric control points) — never evaluate the page's code.
+const TRACK_RE = /\{\s*id:'([^']+)',\s*name:'([^']+)',\s*desc:'([^']*)'[\s\S]*?ctrl:\s*(\[[\d\s,\[\]]+\])/g;
+const TRACKS = [ ...body.matchAll( TRACK_RE ) ].map( ( [ , id, name, desc, ctrl ] ) => ( { id, name, desc, ctrl: JSON.parse( ctrl ) } ) );
+if ( TRACKS.length === 0 ) throw new Error( 'No circuits parsed from ' + SOURCE );
 
 function catmullRom( p0, p1, p2, p3, t ) {
 
