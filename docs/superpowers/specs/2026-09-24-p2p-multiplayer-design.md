@@ -135,3 +135,19 @@ and `lap`/`finish` from `LapTimer`, update `Opponents` each frame.
 Static files only (no bundler, no `package.json`); no signaling server, PeerJS or Firebase;
 single-player, presets, OSM tracks and the editor unchanged when Multiplayer is not used;
 best laps from multiplayer races are not written to the single-player best-lap storage.
+
+## Refinements during planning (2026-09-24)
+
+Validated against a throwaway prototype (unit tests, a real three-page WebRTC session, a crashcat
+push test and a two-page end-to-end lobby/race run):
+
+- `setup` carries the whole `?map=` string, so it may be up to 16 384 characters; all other
+  messages stay at 2 048.
+- Lap plausibility is expressed in world units: laps averaging faster than 40 units/s are
+  rejected (about three times the fastest lap driven on the default track).
+- The host recomputes total and best time from the laps it accepted; a guest's `finish` totals
+  are not trusted.
+- Two extra pure modules: `js/race/Interpolate.js` (state buffer) and
+  `js/race/MultiplayerRace.js` (the controller between session, race rules, game adapter and UI),
+  so the controller is testable in Node with a fake session.
+- Offer expiry is enforced by the host (its own clock), never by comparing clocks across machines.
