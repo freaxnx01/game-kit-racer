@@ -11,11 +11,78 @@
 
 export const DEFAULT_HIGHWAYS = 'primary|secondary|tertiary|unclassified|residential|living_street|service|track';
 
-// bbox = [south, west, north, east]
-export function overpassQuery( bbox, highways = DEFAULT_HIGHWAYS ) {
+// bbox = [south, west, north, east]. With { buildings: true } the query also returns building footprints.
+export function overpassQuery( bbox, highways = DEFAULT_HIGHWAYS, { buildings = false } = {} ) {
 
 	const [ s, w, n, e ] = bbox;
-	return `[out:json][timeout:60];way["highway"~"^(${ highways })$"](${ s },${ w },${ n },${ e });out body;>;out skel qt;`;
+	const area = `(${ s },${ w },${ n },${ e })`;
+	const houses = buildings ? `way["building"]${ area };` : '';
+	return `[out:json][timeout:60];(way["highway"~"^(${ highways })$"]${ area };${ houses });out body;>;out skel qt;`;
+
+}
+
+// Tried in order. overpass.osm.ch only holds Switzerland but is rarely overloaded;
+// the others are worldwide public mirrors.
+export const OVERPASS_MIRRORS = [
+	'https://overpass.osm.ch/api/interpreter',
+	'https://overpass-api.de/api/interpreter',
+	'https://overpass.kumi.systems/api/interpreter',
+	'https://overpass.private.coffee/api/interpreter',
+];
+
+const CACHE_PREFIX = 'osm-track.cache.';
+
+function defaultStorage() {
+
+	try { return globalThis.localStorage ?? null; } catch { return null; }
+
+}
+
+// Same query → same data: answers are cached in storage (localStorage by default, null = no cache)
+// so a flaky Overpass only has to answer once. onTry( host ) is called before each mirror.
+// Resolves { osm, source }; rejects with every mirror's error when all fail.
+export async function fetchOverpass( query, { storage = defaultStorage(), fetchImpl = globalThis.fetch, timeoutMs = 45000, onTry = () => {} } = {} ) {
+
+	const key = CACHE_PREFIX + query;
+
+	try {
+
+		const cached = storage?.getItem( key );
+		if ( cached ) return { osm: JSON.parse( cached ), source: 'cache' };
+
+	} catch {}
+
+	const errors = [];
+
+	for ( const url of OVERPASS_MIRRORS ) {
+
+		const host = new URL( url ).host;
+		onTry( host );
+
+		try {
+
+			const controller = new AbortController();
+			const timer = setTimeout( () => controller.abort(), timeoutMs );
+			const res = await fetchImpl( url, { method: 'POST', body: 'data=' + encodeURIComponent( query ), signal: controller.signal } );
+			clearTimeout( timer );
+			if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
+			const osm = await res.json();
+			if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
+			if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
+
+			try { storage?.setItem( key, JSON.stringify( osm ) ); } catch {}
+
+			return { osm, source: host };
+
+		} catch ( e ) {
+
+			errors.push( `${ host }: ${ e.name === 'AbortError' ? 'timeout' : e.message }` );
+
+		}
+
+	}
+
+	throw new Error( errors.join( ' · ' ) );
 
 }
 
@@ -51,7 +118,7 @@ export function buildGraph( osm, project ) {
 
 	for ( const el of osm.elements ) {
 
-		if ( el.type !== 'way' || ! el.nodes ) continue;
+		if ( el.type !== 'way' || ! el.nodes || ! el.tags?.highway ) continue; // roads only — buildings share the response
 
 		const pts = [];
 
