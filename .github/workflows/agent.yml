@@ -18,4 +18,6 @@ jobs:
       issue-number: ${{ github.event.issue.number }}
       runner-labels: '["ubuntu-latest"]'
       default-model: claude-sonnet-5
+      timeout-minutes: 110        # whole job; must stay above claude-timeout-minutes
+      claude-timeout-minutes: 90  # multi-task plans need far more than the 10-minute default
       pipeline-ref: v2
