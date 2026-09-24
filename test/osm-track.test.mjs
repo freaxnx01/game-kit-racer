@@ -72,3 +72,45 @@ test( 'fetchOverpass_emptyResult_isAnErrorNotCached', async () => {
 	assert.equal( storage.size(), 0 );
 
 } );
+
+// Frames (half-size in metres) around the fixture centre that enclose real street blocks
+const FRAMES = [ 120, 160, 200, 260 ];
+const MPCS = [ 8, 10, 15 ];
+
+function loopPoints( graph, half, mpc ) {
+
+	const { ids, error } = perimeterLoop( graph, { x0: - half, y0: - half, x1: half, y1: half } );
+	assert.equal( error, null );
+	const pts = ids.map( ( id ) => graph.nodes.get( id ) );
+	return simplifyPolyline( [ ...pts, pts[ 0 ] ], mpc ).slice( 0, - 1 );
+
+}
+
+const corners = ( cells ) => trackStats( loopToTrackCells( cells ), 1 ).corner;
+
+test( 'rasterizeLoop_auto_neverWorseThanStairs', () => {
+
+	const graph = buildGraph( fixture, makeProjection( fixture.bbox ) );
+
+	for ( const half of FRAMES ) for ( const mpc of MPCS ) {
+
+		const pts = loopPoints( graph, half, mpc );
+		const auto = rasterizeLoop( pts, mpc, 'auto' );
+		const stairs = rasterizeLoop( pts, mpc, 'stairs' );
+		const label = `frame ±${ half } m, ${ mpc } m/cell`;
+
+		assert.equal( auto.duplicates.size, 0, label );
+		assert.ok( auto.shortcuts <= stairs.shortcuts, `${ label }: auto cut more than stairs` );
+		assert.ok( corners( auto.cells ) <= corners( stairs.cells ), `${ label }: auto has more corners` );
+
+	}
+
+} );
+
+test( 'rasterizeLoop_auto_cutsCornersSomewhere', () => {
+
+	const graph = buildGraph( fixture, makeProjection( fixture.bbox ) );
+	const pts = loopPoints( graph, 200, 10 );
+	assert.ok( corners( rasterizeLoop( pts, 10, 'auto' ).cells ) < corners( rasterizeLoop( pts, 10, 'stairs' ).cells ) );
+
+} );

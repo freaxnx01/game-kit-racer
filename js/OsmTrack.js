@@ -365,27 +365,63 @@ export function lineL( x0, z0, x1, z1 ) {
 }
 
 // Closed polyline (metres, y = north) → closed list of 4-connected, self-consistent grid cells.
-// mode: 'stairs' (Bresenham, follows the street closely) or 'L' (one corner per segment, drives better).
+// mode: 'stairs' (Bresenham, follows the street closely), 'L' (one corner per segment, drives better)
+// or 'auto' (L per segment, stairs where L would run into the loop; whole-loop stairs if that still cuts more).
 // Returns { cells: [[gx,gz],…], duplicates: Set<'gx,gz'>, shortcuts } — shortcuts counts places where
 // the loop hit a cell twice and was cut short (a tile can't be driven twice); duplicates should be empty.
 export function rasterizeLoop( pts, metersPerCell, mode = 'stairs' ) {
 
 	const grid = pts.map( ( p ) => [ Math.round( p.x / metersPerCell ), Math.round( - p.y / metersPerCell ) ] );
-	const draw = mode === 'L' ? lineL : line4;
 
-	let cells = [];
+	if ( mode === 'auto' ) {
+
+		const auto = resolveLoop( traceGrid( grid, autoSegment ) );
+		const stairs = resolveLoop( traceGrid( grid, () => line4 ) );
+		return auto.shortcuts > stairs.shortcuts ? stairs : auto;
+
+	}
+
+	const draw = mode === 'L' ? lineL : line4;
+	return resolveLoop( traceGrid( grid, () => draw ) );
+
+}
+
+// Picks the segment drawer for 'auto': one corner unless that path hits a cell already in the loop.
+function autoSegment( a, b, used ) {
+
+	const seg = lineL( a[ 0 ], a[ 1 ], b[ 0 ], b[ 1 ] );
+	return seg.slice( 1, - 1 ).some( ( [ x, z ] ) => used.has( x + ',' + z ) ) ? line4 : lineL;
+
+}
+
+// Walk the closed grid polyline; pick( a, b, usedCells ) returns the line function for each segment.
+function traceGrid( grid, pick ) {
+
+	const cells = [];
+	const used = new Set();
 
 	for ( let i = 0; i < grid.length; i ++ ) {
 
 		const a = grid[ i ], b = grid[ ( i + 1 ) % grid.length ];
-		const seg = draw( a[ 0 ], a[ 1 ], b[ 0 ], b[ 1 ] );
-		for ( let j = 0; j < seg.length - 1; j ++ ) cells.push( seg[ j ] );
+		const seg = pick( a, b, used )( a[ 0 ], a[ 1 ], b[ 0 ], b[ 1 ] );
+
+		for ( let j = 0; j < seg.length - 1; j ++ ) {
+
+			cells.push( seg[ j ] );
+			used.add( seg[ j ][ 0 ] + ',' + seg[ j ][ 1 ] );
+
+		}
 
 	}
 
-	cells = cleanLoop( cells );
+	return cells;
 
-	// Streets closer than a cell land in the same cell. Cut the loop there, keeping the longer side.
+}
+
+// cleanLoop, then cut the loop wherever it touches itself (keeping the longer side) until no cell repeats.
+function resolveLoop( raw ) {
+
+	let cells = cleanLoop( raw );
 	let shortcuts = 0;
 
 	for ( ;; ) {
