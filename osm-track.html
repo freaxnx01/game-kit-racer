@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<title>OSM Track</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { margin: 0; overflow: hidden; background: #1b1d22; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2430; }
+		canvas { display: block; touch-action: none; cursor: crosshair; }
+		canvas.panning { cursor: grabbing; }
+
+		#panel {
+			position: absolute;
+			top: 20px;
+			left: 20px;
+			width: 300px;
+			padding: 16px 18px;
+			background: rgba(255, 255, 255, 0.94);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			border-radius: 18px;
+			border: 1px solid rgba(0, 0, 0, 0.06);
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+			z-index: 10;
+			font-size: 13px;
+		}
+		#panel h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+		#panel p { margin: 0 0 12px; color: #6b7280; line-height: 1.45; }
+		#panel label { display: block; margin: 10px 0 4px; color: #4a5260; }
+		#panel input[type=text] {
+			width: 100%;
+			padding: 7px 9px;
+			border: 1px solid rgba(0, 0, 0, 0.12);
+			border-radius: 8px;
+			font: inherit;
+			font-size: 12.5px;
+			background: #fff;
+		}
+		#panel input[type=text]:focus { outline: 2px solid #1f2430; outline-offset: -1px; }
+		#panel input[type=range] { width: 100%; margin: 4px 0 0; }
+		.row { display: flex; gap: 8px; align-items: center; }
+		.row label { flex: 1; margin: 0; }
+		.row output { min-width: 56px; text-align: right; color: #1f2430; font-variant-numeric: tabular-nums; }
+		.seg { display: inline-flex; border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 999px; overflow: hidden; }
+		.seg button { padding: 5px 12px; border: none; background: transparent; font: inherit; color: #4a5260; cursor: pointer; }
+		.seg button.active { background: #1f2430; color: #fff; }
+		#panel button.primary {
+			width: 100%;
+			margin-top: 12px;
+			padding: 9px;
+			border: none;
+			border-radius: 999px;
+			background: #1f2430;
+			color: #fff;
+			font: inherit;
+			font-weight: 600;
+			cursor: pointer;
+		}
+		#panel button.primary:disabled { opacity: 0.4; cursor: default; }
+		#stats { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0, 0, 0, 0.08); color: #4a5260; line-height: 1.5; min-height: 40px; }
+		#stats b { color: #1f2430; font-weight: 600; }
+		#stats .warn { color: #b45309; }
+
+		#toolbar {
+			position: absolute;
+			bottom: 20px;
+			left: 50%;
+			transform: translateX(-50%);
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 8px 10px;
+			background: rgba(255, 255, 255, 0.92);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			border-radius: 999px;
+			border: 1px solid rgba(0, 0, 0, 0.06);
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+			z-index: 10;
+		}
+		#toolbar button {
+			padding: 9px 14px;
+			border: none;
+			border-radius: 999px;
+			background: transparent;
+			color: #4a5260;
+			font: inherit;
+			font-size: 13px;
+			cursor: pointer;
+			transition: all 0.15s;
+		}
+		#toolbar button:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); color: #1f2430; }
+		#toolbar button:disabled { opacity: 0.35; cursor: default; }
+		#toolbar button.action { background: #22c55e; color: #fff; font-weight: 600; }
+		#toolbar button.action:hover:not(:disabled) { background: #16a34a; color: #fff; }
+		.separator { width: 1px; height: 24px; background: rgba(0, 0, 0, 0.1); }
+
+		#legend {
+			position: absolute;
+			right: 20px;
+			bottom: 20px;
+			padding: 10px 14px;
+			background: rgba(255, 255, 255, 0.92);
+			border-radius: 12px;
+			font-size: 12px;
+			color: #4a5260;
+			line-height: 1.7;
+			z-index: 10;
+		}
+		#legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+
+		#toast {
+			position: absolute;
+			top: 20px;
+			left: 50%;
+			transform: translateX(-50%) translateY(-20px);
+			padding: 10px 18px;
+			background: #1f2430;
+			color: #fff;
+			border-radius: 999px;
+			font-size: 13px;
+			opacity: 0;
+			transition: all 0.25s;
+			pointer-events: none;
+			z-index: 20;
+			max-width: 60vw;
+		}
+		#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+	</style>
+</head>
+<body>
+	<canvas id="map"></canvas>
+
+	<div id="panel">
+		<h1>Track from OpenStreetMap</h1>
+		<p>Load the streets of an area, then either drag a frame around a neighbourhood (the track runs around its outside) or click points in driving order (the track is routed through them).</p>
+
+		<label for="bbox">Bounding box (south, west, north, east)</label>
+		<input type="text" id="bbox" value="47.5430, 7.9700, 47.5620, 8.0050" spellcheck="false">
+
+		<label for="highways">Road types (OSM highway tags)</label>
+		<input type="text" id="highways" spellcheck="false">
+
+		<button class="primary" id="btn-load">Load streets</button>
+
+		<div class="row" style="margin-top: 14px;">
+			<label>Select with</label>
+			<div class="seg">
+				<button id="sel-frame" class="active" title="Drag a rectangle — the track follows the streets around its outside. Right-drag or shift-drag to pan.">Frame</button>
+				<button id="sel-points" title="Click points on streets in driving order. Drag to pan.">Points</button>
+			</div>
+		</div>
+
+		<div class="row" style="margin-top: 14px;">
+			<label for="mpc">Metres per cell</label>
+			<output id="mpc-out">10 m</output>
+		</div>
+		<input type="range" id="mpc" min="5" max="30" step="1" value="10">
+
+		<div class="row" style="margin-top: 10px;">
+			<label for="tol">Simplify streets</label>
+			<output id="tol-out">1.0 cells</output>
+		</div>
+		<input type="range" id="tol" min="0" max="4" step="0.25" value="1">
+
+		<div class="row" style="margin-top: 12px;">
+			<label>Diagonal streets</label>
+			<div class="seg">
+				<button id="mode-stairs" class="active" title="Bresenham staircase — follows the street closely">Stairs</button>
+				<button id="mode-L" title="One corner per segment — smoother to drive">One corner</button>
+			</div>
+		</div>
+
+		<div id="stats">No streets loaded.</div>
+	</div>
+
+	<div id="toolbar">
+		<button id="btn-undo" disabled>Undo point</button>
+		<button id="btn-clear" disabled>Clear selection</button>
+		<div class="separator"></div>
+		<button id="btn-editor" disabled>Open in editor</button>
+		<button id="btn-copy" disabled>Copy link</button>
+		<button id="btn-play" class="action" disabled>Play track</button>
+	</div>
+
+	<div id="legend">
+		<div><i style="background:#f2c94c"></i>Route along streets</div>
+		<div><i style="background:#60a5fa"></i>Frame</div>
+		<div><i style="background:#4ade80"></i>Straight piece</div>
+		<div><i style="background:#fb923c"></i>Corner piece</div>
+		<div><i style="background:#fff"></i>Finish line</div>
+		<div><i style="background:#ef4444"></i>Cell visited twice</div>
+	</div>
+
+	<div id="toast"></div>
+
+	<script>
+		// If the module below never runs (opened via file://, js/OsmTrack.js missing, syntax error),
+		// say so instead of failing silently.
+		window.addEventListener( 'error', ( e ) => {
+			const el = document.getElementById( 'stats' );
+			if ( el ) el.innerHTML = '<span class="warn">Script error: ' + ( e.message || e.type ) + '</span>';
+		} );
+		setTimeout( () => {
+			if ( window.__osmTrackReady ) return;
+			document.getElementById( 'stats' ).innerHTML = '<span class="warn">Page scripts did not load. Module scripts do not run from file:// — serve the folder over http (e.g. <code>npx serve</code> or <code>python -m http.server</code>) and check that js/OsmTrack.js exists next to js/Track.js.</span>';
+		}, 1500 );
+	</script>
+
+	<script type="module">
+		import {
+			DEFAULT_HIGHWAYS, overpassQuery, makeProjection, buildGraph, nearestNode,
+			routeLoop, perimeterLoop, simplifyPolyline, rasterizeLoop, loopCenter, loopToTrackCells, trackStats, encodeTrackCells,
+		} from './js/OsmTrack.js';
+
+		// Tried in order. overpass.osm.ch only holds Switzerland but is rarely overloaded;
+		// the others are worldwide public mirrors.
+		const OVERPASS = [
+			'https://overpass.osm.ch/api/interpreter',
+			'https://overpass-api.de/api/interpreter',
+			'https://overpass.kumi.systems/api/interpreter',
+			'https://overpass.private.coffee/api/interpreter',
+		];
+		const CACHE_PREFIX = 'osm-track.cache.';
+
+		const canvas = document.getElementById( 'map' );
+		const ctx = canvas.getContext( '2d' );
+		const $ = ( id ) => document.getElementById( id );
+
+		$( 'highways' ).value = DEFAULT_HIGHWAYS;
+
+		// ── State ───────────────────────────────────────────────
+		let graph = null;
+		let bbox = null;
+		let waypoints = [];       // node ids
+		let routeIds = [];        // node ids of the full loop
+		let trackCells = null;    // Track.js cells (centred)
+		let center = null;        // { offX, offZ } from loopCenter
+		let duplicates = new Set();
+		let encoded = null;
+		let mode = 'stairs';
+		let selectMode = 'frame';   // 'frame' | 'points'
+		let frame = null;           // { x0, y0, x1, y1 } in metres
+		let frameDrag = null;
+
+		// View: world metres → screen px
+		const view = { scale: 1, ox: 0, oy: 0 };
+		const toScreen = ( x, y ) => [ x * view.scale + view.ox, - y * view.scale + view.oy ];
+		const toWorld = ( sx, sy ) => [ ( sx - view.ox ) / view.scale, - ( sy - view.oy ) / view.scale ];
+
+		function fitView() {
+
+			const project = makeProjection( bbox );
+			const sw = project( bbox[ 0 ], bbox[ 1 ] ), ne = project( bbox[ 2 ], bbox[ 3 ] );
+			const w = ne.x - sw.x, h = ne.y - sw.y;
+			view.scale = Math.min( ( canvas.width - 380 ) / w, ( canvas.height - 100 ) / h );
+			view.ox = canvas.width / 2 + 160 - ( sw.x + ne.x ) / 2 * view.scale;
+			view.oy = canvas.height / 2 + ( sw.y + ne.y ) / 2 * view.scale;
+
+		}
+
+		// ── Loading ─────────────────────────────────────────────
+		async function loadStreets() {
+
+			const parts = $( 'bbox' ).value.split( ',' ).map( Number );
+			if ( parts.length !== 4 || parts.some( isNaN ) ) return showToast( 'Bounding box needs four numbers: south, west, north, east' );
+
+			bbox = parts;
+			$( 'btn-load' ).disabled = true;
+			$( 'stats' ).textContent = 'Loading streets from Overpass…';
+
+			try {
+
+				const query = overpassQuery( bbox, $( 'highways' ).value.trim() || DEFAULT_HIGHWAYS );
+				const { osm, source } = await fetchOsm( query );
+				graph = buildGraph( osm, makeProjection( bbox ) );
+				waypoints = [];
+				frame = null;
+				fitView();
+				regenerate();
+				$( 'stats' ).innerHTML = `<b>${ graph.ways.length }</b> streets, <b>${ graph.nodes.size }</b> nodes loaded (${ source }).<br>Drag a frame around a neighbourhood.`;
+
+			} catch ( e ) {
+
+				showToast( 'Could not load streets: ' + e.message );
+				$( 'stats' ).textContent = 'No streets loaded.';
+
+			}
+
+			$( 'btn-load' ).disabled = false;
+			draw();
+
+		}
+
+		// Same query → same data; keep it in localStorage so a flaky Overpass only has to answer once.
+		async function fetchOsm( query ) {
+
+			const key = CACHE_PREFIX + query;
+
+			try {
+
+				const cached = localStorage.getItem( key );
+				if ( cached ) return { osm: JSON.parse( cached ), source: 'cached — clear site data to refetch' };
+
+			} catch {}
+
+			const errors = [];
+
+			for ( const url of OVERPASS ) {
+
+				$( 'stats' ).textContent = `Loading streets from ${ new URL( url ).host }…`;
+
+				try {
+
+					const controller = new AbortController();
+					const timer = setTimeout( () => controller.abort(), 45000 );
+					const res = await fetch( url, { method: 'POST', body: 'data=' + encodeURIComponent( query ), signal: controller.signal } );
+					clearTimeout( timer );
+					if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
+					const osm = await res.json();
+					if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
+					if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
+
+					try { localStorage.setItem( key, JSON.stringify( osm ) ); } catch {}
+
+					return { osm, source: new URL( url ).host };
+
+				} catch ( e ) {
+
+					errors.push( `${ new URL( url ).host }: ${ e.name === 'AbortError' ? 'timeout' : e.message }` );
+
+				}
+
+			}
+
+			throw new Error( errors.join( ' · ' ) );
+
+		}
+
+		// ── Generation ──────────────────────────────────────────
+		function regenerate() {
+
+			routeIds = [];
+			trackCells = null;
+			center = null;
+			duplicates = new Set();
+			encoded = null;
+
+			const mpc = Number( $( 'mpc' ).value );
+			const tol = Number( $( 'tol' ).value ) * mpc;
+
+			let haveLoop = false;
+
+			if ( graph && selectMode === 'frame' && frame ) {
+
+				const { ids, error } = perimeterLoop( graph, frame );
+				routeIds = ids;
+				haveLoop = ids.length >= 3;
+				if ( error ) $( 'stats' ).innerHTML = `<span class="warn">${ error }</span>`;
+
+			} else if ( graph && selectMode === 'points' && waypoints.length >= 2 ) {
+
+				const { ids, missing } = routeLoop( graph, waypoints );
+				routeIds = ids;
+				haveLoop = ids.length >= 3 && waypoints.length >= 3;
+				if ( missing.length ) showToast( 'Some points are not connected by road — try another street' );
+
+			}
+
+			if ( haveLoop ) {
+
+				try {
+
+					let pts = routeIds.map( ( id ) => graph.nodes.get( id ) );
+					pts = simplifyPolyline( [ ...pts, pts[ 0 ] ], tol ).slice( 0, - 1 );
+					const r = rasterizeLoop( pts, mpc, mode );
+					duplicates = r.duplicates;
+					center = loopCenter( r.cells );
+					trackCells = loopToTrackCells( r.cells );
+					encoded = duplicates.size === 0 ? encodeTrackCells( trackCells ) : null;
+
+					const s = trackStats( trackCells, mpc );
+					let html = `<b>${ s.cells }</b> cells · ${ s.straight } straight, ${ s.corner } corners<br>Lap ≈ <b>${ ( s.lengthMeters / 1000 ).toFixed( 2 ) } km</b> of real road · grid ${ center.width }×${ center.height }`;
+					if ( r.shortcuts ) html += `<br><span class="warn">Route touched itself ${ r.shortcuts }× — cut short there. Lower metres per cell to keep more of it.</span>`;
+					if ( duplicates.size ) html += `<br><span class="warn">${ duplicates.size } cells are driven twice — move a point, or raise metres per cell.</span>`;
+					$( 'stats' ).innerHTML = html;
+
+				} catch ( e ) {
+
+					$( 'stats' ).innerHTML = `<span class="warn">${ e.message }</span>`;
+
+				}
+
+			} else if ( graph && ! ( selectMode === 'frame' && frame ) ) {
+
+				$( 'stats' ).innerHTML = selectMode === 'frame'
+					? `<b>${ graph.ways.length }</b> streets loaded.<br>Drag a frame around a neighbourhood.`
+					: `<b>${ graph.ways.length }</b> streets loaded.<br>${ waypoints.length } of 3 points placed.`;
+
+			}
+
+			$( 'btn-undo' ).disabled = selectMode !== 'points' || waypoints.length === 0;
+			$( 'btn-clear' ).disabled = waypoints.length === 0 && ! frame;
+			$( 'btn-play' ).disabled = $( 'btn-editor' ).disabled = $( 'btn-copy' ).disabled = ! encoded;
+			draw();
+
+		}
+
+		// ── Drawing ─────────────────────────────────────────────
+		const ROAD_COLOR = {
+			primary: '#9aa3b2', secondary: '#9aa3b2', tertiary: '#8a93a2',
+			residential: '#6b7380', unclassified: '#6b7380', living_street: '#5c6470',
+			service: '#4a515c', track: '#3f4550',
+		};
+
+		function draw() {
+
+			ctx.clearRect( 0, 0, canvas.width, canvas.height );
+			if ( ! graph ) return;
+
+			const mpc = Number( $( 'mpc' ).value );
+
+			// Streets
+			ctx.lineCap = 'round';
+			ctx.lineJoin = 'round';
+
+			for ( const way of graph.ways ) {
+
+				ctx.strokeStyle = ROAD_COLOR[ way.highway ] ?? '#5c6470';
+				ctx.lineWidth = way.highway === 'service' || way.highway === 'track' ? 1 : 2;
+				ctx.beginPath();
+				way.pts.forEach( ( p, i ) => {
+
+					const [ sx, sy ] = toScreen( p.x, p.y );
+					i === 0 ? ctx.moveTo( sx, sy ) : ctx.lineTo( sx, sy );
+
+				} );
+				ctx.stroke();
+
+			}
+
+			// Route
+			if ( routeIds.length > 1 ) {
+
+				ctx.strokeStyle = '#f2c94c';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				routeIds.forEach( ( id, i ) => {
+
+					const p = graph.nodes.get( id );
+					const [ sx, sy ] = toScreen( p.x, p.y );
+					i === 0 ? ctx.moveTo( sx, sy ) : ctx.lineTo( sx, sy );
+
+				} );
+				if ( selectMode === 'frame' || waypoints.length >= 3 ) ctx.closePath();
+				ctx.stroke();
+
+			}
+
+			// Track cells
+			if ( trackCells && center ) {
+
+				const size = mpc * view.scale;
+
+				for ( const [ gx, gz, type ] of trackCells ) {
+
+					const wx = ( gx + center.offX ) * mpc, wy = - ( gz + center.offZ ) * mpc;
+					const [ sx, sy ] = toScreen( wx, wy );
+					const key = ( gx + center.offX ) + ',' + ( gz + center.offZ );
+					ctx.fillStyle = duplicates.has( key ) ? 'rgba(239,68,68,0.8)'
+						: type === 'track-finish' ? 'rgba(255,255,255,0.95)'
+						: type === 'track-corner' ? 'rgba(251,146,60,0.55)'
+						: 'rgba(74,222,128,0.5)';
+					ctx.fillRect( sx - size / 2, sy - size / 2, size, size );
+
+				}
+
+			}
+
+			// Frame
+			const fr = frameDrag || frame;
+			if ( selectMode === 'frame' && fr ) {
+
+				const [ ax, ay ] = toScreen( fr.x0, fr.y0 ), [ bx, by ] = toScreen( fr.x1, fr.y1 );
+				ctx.strokeStyle = '#60a5fa';
+				ctx.lineWidth = 1.5;
+				ctx.setLineDash( [ 6, 4 ] );
+				ctx.strokeRect( Math.min( ax, bx ), Math.min( ay, by ), Math.abs( bx - ax ), Math.abs( by - ay ) );
+				ctx.setLineDash( [] );
+
+			}
+
+			// Waypoints
+			if ( selectMode === 'points' ) waypoints.forEach( ( id, i ) => {
+
+				const p = graph.nodes.get( id );
+				const [ sx, sy ] = toScreen( p.x, p.y );
+				ctx.fillStyle = i === 0 ? '#fff' : '#f2c94c';
+				ctx.strokeStyle = '#1b1d22';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.arc( sx, sy, 8, 0, Math.PI * 2 );
+				ctx.fill();
+				ctx.stroke();
+				ctx.fillStyle = '#1b1d22';
+				ctx.font = 'bold 10px sans-serif';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText( String( i + 1 ), sx, sy + 0.5 );
+
+			} );
+
+			// Scale bar
+			const bar = 200 * view.scale;
+			ctx.strokeStyle = '#fff';
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo( canvas.width - 40 - bar, 40 );
+			ctx.lineTo( canvas.width - 40, 40 );
+			ctx.stroke();
+			ctx.fillStyle = '#fff';
+			ctx.font = '12px sans-serif';
+			ctx.textAlign = 'right';
+			ctx.textBaseline = 'bottom';
+			ctx.fillText( '200 m · north is up', canvas.width - 40, 34 );
+
+		}
+
+		// ── Interaction ─────────────────────────────────────────
+		let pointerDown = null, dragged = false;
+
+		canvas.addEventListener( 'contextmenu', ( e ) => e.preventDefault() );
+
+		canvas.addEventListener( 'pointerdown', ( e ) => {
+
+			const framing = graph && selectMode === 'frame' && e.button === 0 && ! e.shiftKey;
+			pointerDown = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, framing };
+			dragged = false;
+			canvas.setPointerCapture( e.pointerId );
+
+		} );
+
+		canvas.addEventListener( 'pointermove', ( e ) => {
+
+			if ( ! pointerDown ) return;
+			const dx = e.clientX - pointerDown.x, dy = e.clientY - pointerDown.y;
+			if ( ! dragged && Math.hypot( dx, dy ) < 4 ) return;
+			dragged = true;
+
+			if ( pointerDown.framing ) {
+
+				const [ x0, y0 ] = toWorld( pointerDown.x, pointerDown.y );
+				const [ x1, y1 ] = toWorld( e.clientX, e.clientY );
+				frameDrag = { x0, y0, x1, y1 };
+				draw();
+				return;
+
+			}
+
+			canvas.classList.add( 'panning' );
+			view.ox = pointerDown.ox + dx;
+			view.oy = pointerDown.oy + dy;
+			draw();
+
+		} );
+
+		canvas.addEventListener( 'pointerup', ( e ) => {
+
+			canvas.classList.remove( 'panning' );
+			const wasClick = pointerDown && ! dragged;
+			const wasFrame = pointerDown && pointerDown.framing && dragged;
+			pointerDown = null;
+
+			if ( wasFrame ) {
+
+				frame = frameDrag;
+				frameDrag = null;
+				regenerate();
+				return;
+
+			}
+
+			if ( ! wasClick || ! graph || selectMode !== 'points' ) return;
+
+			const [ wx, wy ] = toWorld( e.clientX, e.clientY );
+
+			// Click on an existing waypoint removes it
+			for ( let i = 0; i < waypoints.length; i ++ ) {
+
+				const p = graph.nodes.get( waypoints[ i ] );
+				const [ sx, sy ] = toScreen( p.x, p.y );
+				if ( Math.hypot( sx - e.clientX, sy - e.clientY ) < 12 ) {
+
+					waypoints.splice( i, 1 );
+					regenerate();
+					return;
+
+				}
+
+			}
+
+			const hit = nearestNode( graph, wx, wy );
+			if ( ! hit || hit.dist * view.scale > 40 ) return showToast( 'Click closer to a street' );
+			if ( waypoints.includes( hit.node.id ) ) return;
+			waypoints.push( hit.node.id );
+			regenerate();
+
+		} );
+
+		canvas.addEventListener( 'wheel', ( e ) => {
+
+			e.preventDefault();
+			const f = Math.exp( - e.deltaY * 0.0015 );
+			view.ox = e.clientX - ( e.clientX - view.ox ) * f;
+			view.oy = e.clientY - ( e.clientY - view.oy ) * f;
+			view.scale *= f;
+			draw();
+
+		}, { passive: false } );
+
+		$( 'btn-load' ).addEventListener( 'click', loadStreets );
+		$( 'btn-undo' ).addEventListener( 'click', () => { waypoints.pop(); regenerate(); } );
+		$( 'btn-clear' ).addEventListener( 'click', () => { waypoints = []; frame = null; regenerate(); } );
+		$( 'sel-frame' ).addEventListener( 'click', () => setSelectMode( 'frame' ) );
+		$( 'sel-points' ).addEventListener( 'click', () => setSelectMode( 'points' ) );
+
+		function setSelectMode( m ) {
+
+			selectMode = m;
+			$( 'sel-frame' ).classList.toggle( 'active', m === 'frame' );
+			$( 'sel-points' ).classList.toggle( 'active', m === 'points' );
+			regenerate();
+
+		}
+		$( 'btn-play' ).addEventListener( 'click', () => window.open( 'index.html?map=' + encoded, '_blank' ) );
+		$( 'btn-editor' ).addEventListener( 'click', () => window.open( 'editor.html?map=' + encoded, '_blank' ) );
+		$( 'btn-copy' ).addEventListener( 'click', async () => {
+
+			const url = new URL( 'index.html?map=' + encoded, location.href ).href;
+			try { await navigator.clipboard.writeText( url ); showToast( 'Link copied' ); }
+			catch { prompt( 'Copy this link', url ); }
+
+		} );
+
+		$( 'mpc' ).addEventListener( 'input', () => { $( 'mpc-out' ).textContent = $( 'mpc' ).value + ' m'; regenerate(); } );
+		$( 'tol' ).addEventListener( 'input', () => { $( 'tol-out' ).textContent = Number( $( 'tol' ).value ).toFixed( 2 ) + ' cells'; regenerate(); } );
+		$( 'mode-stairs' ).addEventListener( 'click', () => setMode( 'stairs' ) );
+		$( 'mode-L' ).addEventListener( 'click', () => setMode( 'L' ) );
+
+		function setMode( m ) {
+
+			mode = m;
+			$( 'mode-stairs' ).classList.toggle( 'active', m === 'stairs' );
+			$( 'mode-L' ).classList.toggle( 'active', m === 'L' );
+			regenerate();
+
+		}
+
+		let toastTimer;
+		function showToast( msg ) {
+
+			const t = $( 'toast' );
+			t.textContent = msg;
+			t.classList.add( 'show' );
+			clearTimeout( toastTimer );
+			toastTimer = setTimeout( () => t.classList.remove( 'show' ), 3000 );
+
+		}
+
+		function resize() {
+
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+			draw();
+
+		}
+
+		window.addEventListener( 'resize', resize );
+		resize();
+		window.__osmTrackReady = true;
+	</script>
+</body>
+</html>
