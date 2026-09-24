@@ -14,6 +14,8 @@ import { GameAudio } from './Audio.js';
 import { LapTimer } from './LapTimer.js';
 import { ColorMapGLTFLoader } from './Loader.js';
 import { Hud } from './OsmHud.js';
+import { parseOsmParam, viewArea } from './OsmData.js';
+import { loadSurroundings, VIEW_MARGIN_CELLS } from './OsmScene.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -139,6 +141,10 @@ async function init() {
 
 	}
 
+	// &osm= (from osm-track.html) adds the real surroundings around a generated track
+	const osmParam = customCells ? parseOsmParam( new URLSearchParams( window.location.search ).get( 'osm' ) ) : null;
+	const osmArea = osmParam ? viewArea( customCells, VIEW_MARGIN_CELLS ) : null;
+
 	// Compute track bounds and size physics/shadows to fit
 	const bounds = computeTrackBounds( customCells );
 	const hw = bounds.halfWidth;
@@ -155,7 +161,7 @@ async function init() {
 	scene.fog.near = groundSize * 0.4;
 	scene.fog.far = groundSize * 0.8;
 
-	buildTrack( scene, models, customCells );
+	buildTrack( scene, models, customCells, { grassArea: osmArea } );
 
 	// Probes
 
@@ -236,6 +242,25 @@ async function init() {
 
 	const cellSize = CELL_RAW * GRID_SCALE;
 	const hud = new Hud( customCells || TRACK_CELLS, cellSize );
+
+	if ( osmParam ) {
+
+		hud.note( 'Loading surroundings…' );
+		loadSurroundings( scene, osmParam, customCells, osmArea, cellSize )
+			.then( ( layers ) => {
+
+				hud.setOsm( layers );
+				hud.note( '' );
+
+			} )
+			.catch( ( e ) => {
+
+				console.warn( 'OSM surroundings unavailable:', e.message );
+				hud.note( 'Surroundings unavailable' );
+
+			} );
+
+	}
 
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
