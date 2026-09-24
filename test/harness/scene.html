@@ -1,0 +1,28 @@
+<!DOCTYPE html><html><head><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { buildGraph, makeProjection, perimeterLoop, simplifyPolyline, rasterizeLoop, loopCenter, loopToTrackCells } from '../../js/OsmTrack.js';
+import { osmFeatures, clipStreets, buildingsOffTrack, budgetBuildings, viewArea } from '../../js/OsmData.js';
+import { streetRibbons, extrudedBuildings, loadSurroundings } from '../../js/OsmScene.js';
+const CELL = 9.99 * 0.75;
+if ( new URLSearchParams( location.search ).has( 'fail' ) ) {
+	for ( const k of Object.keys( localStorage ) ) if ( k.startsWith( 'osm-track.cache.' ) ) localStorage.removeItem( k );
+	const scene = new THREE.Scene();
+	window.result = await loadSurroundings( scene, { bbox: [ 47.548, 7.98, 47.556, 7.995 ], mpc: 10, offX: 0, offZ: 0 }, [ [ 0, 0 ] ], { minX: -8, maxX: 8, minZ: -8, maxZ: 8 }, CELL )
+		.then( () => ( { rejected: false } ), ( e ) => ( { rejected: true, children: scene.children.length, message: e.message.slice( 0, 60 ) } ) );
+	await new Promise( () => {} ); // stop here
+}
+const fixture = await ( await fetch( '../fixtures/sisseln.json' ) ).json();
+const graph = buildGraph( fixture, makeProjection( fixture.bbox ) );
+const { ids } = perimeterLoop( graph, { x0: -200, y0: -200, x1: 200, y1: 200 } );
+const pts = ids.map( ( id ) => graph.nodes.get( id ) );
+const { cells } = rasterizeLoop( simplifyPolyline( [ ...pts, pts[ 0 ] ], 10 ).slice( 0, -1 ), 10, 'auto' );
+const { offX, offZ } = loopCenter( cells );
+const track = loopToTrackCells( cells );
+const f = osmFeatures( fixture, { bbox: fixture.bbox, mpc: 10, offX, offZ }, CELL );
+const area = viewArea( track, 8 );
+const houses = budgetBuildings( buildingsOffTrack( f.buildings, track, area, CELL ), track, CELL, 20000 );
+const b = extrudedBuildings( houses, CELL / 10 ), s = streetRibbons( clipStreets( f.streets, track, area, CELL ), CELL * 0.5 );
+const box = new THREE.Box3().setFromObject( b );
+window.result = { houses: houses.length, triangles: b.geometry.attributes.position.count / 3, hasColor: !! b.geometry.attributes.color, minY: +box.min.y.toFixed(3), maxY: +box.max.y.toFixed(2), streetTris: s.geometry.attributes.position.count / 3 };
+</script></body></html>

@@ -168,7 +168,8 @@
 		<div class="row" style="margin-top: 12px;">
 			<label>Diagonal streets</label>
 			<div class="seg">
-				<button id="mode-stairs" class="active" title="Bresenham staircase — follows the street closely">Stairs</button>
+				<button id="mode-auto" class="active" title="One corner per segment, staircase where that would cut the route">Auto</button>
+				<button id="mode-stairs" title="Bresenham staircase — follows the street closely">Stairs</button>
 				<button id="mode-L" title="One corner per segment — smoother to drive">One corner</button>
 			</div>
 		</div>
@@ -213,17 +214,9 @@
 		import {
 			DEFAULT_HIGHWAYS, overpassQuery, makeProjection, buildGraph, nearestNode,
 			routeLoop, perimeterLoop, simplifyPolyline, rasterizeLoop, loopCenter, loopToTrackCells, trackStats, encodeTrackCells,
+			fetchOverpass,
 		} from './js/OsmTrack.js';
-
-		// Tried in order. overpass.osm.ch only holds Switzerland but is rarely overloaded;
-		// the others are worldwide public mirrors.
-		const OVERPASS = [
-			'https://overpass.osm.ch/api/interpreter',
-			'https://overpass-api.de/api/interpreter',
-			'https://overpass.kumi.systems/api/interpreter',
-			'https://overpass.private.coffee/api/interpreter',
-		];
-		const CACHE_PREFIX = 'osm-track.cache.';
+		import { encodeOsmParam } from './js/OsmData.js';
 
 		const canvas = document.getElementById( 'map' );
 		const ctx = canvas.getContext( '2d' );
@@ -240,7 +233,7 @@
 		let center = null;        // { offX, offZ } from loopCenter
 		let duplicates = new Set();
 		let encoded = null;
-		let mode = 'stairs';
+		let mode = 'auto';
 		let selectMode = 'frame';   // 'frame' | 'points'
 		let frame = null;           // { x0, y0, x1, y1 } in metres
 		let frameDrag = null;
@@ -273,8 +266,10 @@
 
 			try {
 
-				const query = overpassQuery( bbox, $( 'highways' ).value.trim() || DEFAULT_HIGHWAYS );
-				const { osm, source } = await fetchOsm( query );
+				// Buildings are fetched too so the game finds the same query in the cache.
+				const query = overpassQuery( bbox, $( 'highways' ).value.trim() || DEFAULT_HIGHWAYS, { buildings: true } );
+				const { osm, source: from } = await fetchOverpass( query, { onTry: ( host ) => { $( 'stats' ).textContent = `Loading streets from ${ host }…`; } } );
+				const source = from === 'cache' ? 'cached — clear site data to refetch' : from;
 				graph = buildGraph( osm, makeProjection( bbox ) );
 				waypoints = [];
 				frame = null;
@@ -291,51 +286,6 @@
 
 			$( 'btn-load' ).disabled = false;
 			draw();
-
-		}
-
-		// Same query → same data; keep it in localStorage so a flaky Overpass only has to answer once.
-		async function fetchOsm( query ) {
-
-			const key = CACHE_PREFIX + query;
-
-			try {
-
-				const cached = localStorage.getItem( key );
-				if ( cached ) return { osm: JSON.parse( cached ), source: 'cached — clear site data to refetch' };
-
-			} catch {}
-
-			const errors = [];
-
-			for ( const url of OVERPASS ) {
-
-				$( 'stats' ).textContent = `Loading streets from ${ new URL( url ).host }…`;
-
-				try {
-
-					const controller = new AbortController();
-					const timer = setTimeout( () => controller.abort(), 45000 );
-					const res = await fetch( url, { method: 'POST', body: 'data=' + encodeURIComponent( query ), signal: controller.signal } );
-					clearTimeout( timer );
-					if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
-					const osm = await res.json();
-					if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
-					if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
-
-					try { localStorage.setItem( key, JSON.stringify( osm ) ); } catch {}
-
-					return { osm, source: new URL( url ).host };
-
-				} catch ( e ) {
-
-					errors.push( `${ new URL( url ).host }: ${ e.name === 'AbortError' ? 'timeout' : e.message }` );
-
-				}
-
-			}
-
-			throw new Error( errors.join( ' · ' ) );
 
 		}
 
@@ -634,11 +584,14 @@
 			regenerate();
 
 		}
-		$( 'btn-play' ).addEventListener( 'click', () => window.open( 'index.html?map=' + encoded, '_blank' ) );
+		// &osm= lets the game fetch the same streets and buildings and place them on the tiles.
+		const trackLink = ( page ) => page + '?map=' + encoded + '&osm=' + encodeOsmParam( { bbox, mpc: Number( $( 'mpc' ).value ), offX: center.offX, offZ: center.offZ } );
+
+		$( 'btn-play' ).addEventListener( 'click', () => window.open( trackLink( 'index.html' ), '_blank' ) );
 		$( 'btn-editor' ).addEventListener( 'click', () => window.open( 'editor.html?map=' + encoded, '_blank' ) );
 		$( 'btn-copy' ).addEventListener( 'click', async () => {
 
-			const url = new URL( 'index.html?map=' + encoded, location.href ).href;
+			const url = new URL( trackLink( 'index.html' ), location.href ).href;
 			try { await navigator.clipboard.writeText( url ); showToast( 'Link copied' ); }
 			catch { prompt( 'Copy this link', url ); }
 
@@ -646,12 +599,14 @@
 
 		$( 'mpc' ).addEventListener( 'input', () => { $( 'mpc-out' ).textContent = $( 'mpc' ).value + ' m'; regenerate(); } );
 		$( 'tol' ).addEventListener( 'input', () => { $( 'tol-out' ).textContent = Number( $( 'tol' ).value ).toFixed( 2 ) + ' cells'; regenerate(); } );
+		$( 'mode-auto' ).addEventListener( 'click', () => setMode( 'auto' ) );
 		$( 'mode-stairs' ).addEventListener( 'click', () => setMode( 'stairs' ) );
 		$( 'mode-L' ).addEventListener( 'click', () => setMode( 'L' ) );
 
 		function setMode( m ) {
 
 			mode = m;
+			$( 'mode-auto' ).classList.toggle( 'active', m === 'auto' );
 			$( 'mode-stairs' ).classList.toggle( 'active', m === 'stairs' );
 			$( 'mode-L' ).classList.toggle( 'active', m === 'L' );
 			regenerate();

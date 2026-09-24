@@ -6,6 +6,14 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Added
+
+- Mini map in the top-right corner on every track, showing where you are.
+- Tracks built from OpenStreetMap now show the real buildings and side streets
+  around the road, and the name of the street you are driving on.
+- New "Auto" option in the OpenStreetMap track builder: smoother corners without
+  losing parts of the route. It is the new default.
+
 ## [0.1.0] - 2026-09-24
 
 ### Added

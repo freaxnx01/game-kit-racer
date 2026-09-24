@@ -115,7 +115,9 @@ const NPC_TRUCKS = [
 	[ 'vehicle-truck-red',    -1.36, -0.15, -23.80, 155.9 ],
 ];
 
-export function buildTrack( scene, models, customCells ) {
+// options.grassArea { minX, maxX, minZ, maxZ } (grid cells): plain grass there instead of forest and
+// tents, and the ground extends to cover it — room for OpenStreetMap buildings and streets.
+export function buildTrack( scene, models, customCells, { grassArea = null } = {} ) {
 
 	const trackGroup = new THREE.Group();
 	trackGroup.position.y = -0.5;
@@ -177,6 +179,15 @@ export function buildTrack( scene, models, customCells ) {
 		}
 
 		const pad = 3;
+		const inGrass = ( gx, gz ) => grassArea !== null &&
+			gx >= grassArea.minX && gx <= grassArea.maxX && gz >= grassArea.minZ && gz <= grassArea.maxZ;
+
+		if ( grassArea ) {
+
+			minX = Math.min( minX, grassArea.minX ); maxX = Math.max( maxX, grassArea.maxX );
+			minZ = Math.min( minZ, grassArea.minZ ); maxZ = Math.max( maxZ, grassArea.maxZ );
+
+		}
 
 		// Simple hash for deterministic pseudo-random placement
 		function hash( gx, gz ) {
@@ -200,7 +211,11 @@ export function buildTrack( scene, models, customCells ) {
 				const x = ( gx + 0.5 ) * CELL_RAW;
 				const z = ( gz + 0.5 ) * CELL_RAW;
 
-				if ( dist <= 1 ) {
+				if ( inGrass( gx, gz ) ) {
+
+					emptyPositions.push( x, z, 0 );
+
+				} else if ( dist <= 1 ) {
 
 					// ~15% chance of tents in the empty ring
 					if ( hash( gx, gz ) % 7 === 0 ) {

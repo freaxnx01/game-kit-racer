@@ -6,13 +6,16 @@ import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, e
 import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } from './Track.js';
+import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { DriftMarks } from './DriftMarks.js';
 import { GameAudio } from './Audio.js';
 import { LapTimer } from './LapTimer.js';
 import { ColorMapGLTFLoader } from './Loader.js';
+import { Hud } from './OsmHud.js';
+import { parseOsmParam, viewArea } from './OsmData.js';
+import { loadSurroundings, VIEW_MARGIN_CELLS } from './OsmScene.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -138,6 +141,11 @@ async function init() {
 
 	}
 
+	// &osm= (from osm-track.html) adds the real surroundings around a generated track
+	const osmRaw = new URLSearchParams( window.location.search ).get( 'osm' );
+	const osmParam = customCells ? parseOsmParam( osmRaw ) : null;
+	const osmArea = osmParam ? viewArea( customCells, VIEW_MARGIN_CELLS ) : null;
+
 	// Compute track bounds and size physics/shadows to fit
 	const bounds = computeTrackBounds( customCells );
 	const hw = bounds.halfWidth;
@@ -154,7 +162,7 @@ async function init() {
 	scene.fog.near = groundSize * 0.4;
 	scene.fog.far = groundSize * 0.8;
 
-	buildTrack( scene, models, customCells );
+	buildTrack( scene, models, customCells, { grassArea: osmArea } );
 
 	// Probes
 
@@ -233,6 +241,33 @@ async function init() {
 
 	const lapTimer = new LapTimer( customCells, mapParam );
 
+	const cellSize = CELL_RAW * GRID_SCALE;
+	const hud = new Hud( customCells || TRACK_CELLS, cellSize );
+
+	if ( osmParam ) {
+
+		hud.note( 'Loading surroundings…' );
+		loadSurroundings( scene, osmParam, customCells, osmArea, cellSize )
+			.then( ( layers ) => {
+
+				hud.setOsm( layers );
+				hud.note( '' );
+
+			} )
+			.catch( ( e ) => {
+
+				console.warn( 'OSM surroundings unavailable:', e.message );
+				hud.note( 'Surroundings unavailable' );
+
+			} );
+
+	} else if ( osmRaw !== null ) {
+
+		console.warn( 'OSM surroundings unavailable:', customCells ? 'malformed or too large &osm= value' : 'no valid ?map= track to place them around' );
+		hud.note( 'Surroundings unavailable' );
+
+	}
+
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
 
@@ -281,6 +316,9 @@ async function init() {
 
 		const hasInput = input.touchActive || Math.abs( input.x ) > 0.05 || Math.abs( input.z ) > 0.05;
 		lapTimer.update( dt, vehicle.spherePos, hasInput );
+
+		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+		hud.update( vehicle.spherePos.x, vehicle.spherePos.z, _forward.x, _forward.z );
 
 		renderer.render( scene, cam.camera );
 

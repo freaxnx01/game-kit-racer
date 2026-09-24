@@ -1,0 +1,29 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;background:#3a7;height:100vh}#lap-timer{position:absolute;top:12px;left:12px;min-width:140px;padding:10px 14px;height:90px;background:#0008}</style></head><body><div id="lap-timer"></div>
+<script type="module">
+import { buildGraph, makeProjection, perimeterLoop, simplifyPolyline, rasterizeLoop, loopCenter, loopToTrackCells } from '../../js/OsmTrack.js';
+import { osmFeatures, clipStreets, buildingsOffTrack, viewArea, StreetIndex } from '../../js/OsmData.js';
+import { Hud } from '../../js/OsmHud.js';
+const CELL = 9.99 * 0.75;
+const fixture = await ( await fetch( '../fixtures/sisseln.json' ) ).json();
+const graph = buildGraph( fixture, makeProjection( fixture.bbox ) );
+const { ids } = perimeterLoop( graph, { x0: -200, y0: -200, x1: 200, y1: 200 } );
+const pts = ids.map( ( id ) => graph.nodes.get( id ) );
+const { cells } = rasterizeLoop( simplifyPolyline( [ ...pts, pts[ 0 ] ], 10 ).slice( 0, -1 ), 10, 'auto' );
+const { offX, offZ } = loopCenter( cells );
+const track = loopToTrackCells( cells );
+const param = { bbox: fixture.bbox, mpc: 10, offX, offZ };
+const f = osmFeatures( fixture, param, CELL );
+const area = viewArea( track, 8 );
+const hud = new Hud( track, CELL );
+const generic = new URLSearchParams( location.search ).has( 'generic' );
+if ( generic ) {
+	hud.update( 0, 0, 0, 0 ); // no OSM layers, zero heading vector
+	window.__done = true;
+	await new Promise( () => {} ); // stop here
+}
+hud.setOsm( { streets: clipStreets( f.streets, track, area, CELL ), buildings: buildingsOffTrack( f.buildings, track, area, CELL ), index: new StreetIndex( f.streets, CELL ) } );
+const h = f.streets.find( ( s ) => s.name === 'Hauptstrasse' ).pts;
+hud.update( ( h[0][0] + h[1][0] ) / 2, ( h[0][1] + h[1][1] ) / 2, 1, 0 );
+window.harness = { hud };
+window.__done = true;
+</script></body></html>
