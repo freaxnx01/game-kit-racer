@@ -1,6 +1,6 @@
 # Peer-to-peer multiplayer — race friends over WebRTC
 
-Date: 2026-09-24 · Status: approved design, awaiting spec review · Issue: #1
+Date: 2026-09-24 · Status: approved · Issue: #1
 
 ## Problem
 
@@ -100,7 +100,7 @@ and `lap`/`finish` from `LapTimer`, update `Opponents` each frame.
    guest subtracts half its measured RTT so GO lands within about a frame everywhere. Input is
    ignored until GO.
 4. **Racing.** Existing `LapTimer` rules (every cell visited). Each lap sends `lap`; the last
-   lap sends `finish`. Host rejects laps averaging faster than 80 m/s over the track length.
+   lap sends `finish`. Host rejects laps averaging faster than 40 world units/s (see refinements).
    Live position list P1–P4 by laps, then progress.
 5. **Results.** Order, total time, best lap — when everyone finished, or 30 s after the winner.
    Host: Rematch (same track, new countdown) or Back to lobby.
