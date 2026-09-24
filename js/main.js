@@ -6,13 +6,14 @@ import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, e
 import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } from './Track.js';
+import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { DriftMarks } from './DriftMarks.js';
 import { GameAudio } from './Audio.js';
 import { LapTimer } from './LapTimer.js';
 import { ColorMapGLTFLoader } from './Loader.js';
+import { Hud } from './OsmHud.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -233,6 +234,9 @@ async function init() {
 
 	const lapTimer = new LapTimer( customCells, mapParam );
 
+	const cellSize = CELL_RAW * GRID_SCALE;
+	const hud = new Hud( customCells || TRACK_CELLS, cellSize );
+
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
 
@@ -281,6 +285,9 @@ async function init() {
 
 		const hasInput = input.touchActive || Math.abs( input.x ) > 0.05 || Math.abs( input.z ) > 0.05;
 		lapTimer.update( dt, vehicle.spherePos, hasInput );
+
+		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+		hud.update( vehicle.spherePos.x, vehicle.spherePos.z, _forward.x, _forward.z );
 
 		renderer.render( scene, cam.camera );
 
