@@ -127,16 +127,32 @@ function isClosedRing( ids ) {
 }
 
 // Street polylines cut into runs that stay inside the area and off track cells, so ribbons never
-// cover tiles. Segments are checked in quarter-cell steps.
+// cover tiles. Segments are checked in quarter-cell steps. A run that never gets farther than one
+// cell from a track cell is the loop's own street beside its tiles (they sit up to half a cell off
+// the real street) and is dropped; runs that leave the track's neighbourhood are real side streets.
 export function clipStreets( streets, trackCells, area, cellSize ) {
 
 	const blocked = cellKeys( trackCells );
+	const near = new Set();
+
+	for ( const [ gx, gz ] of trackCells ) {
+
+		for ( let dx = - 1; dx <= 1; dx ++ ) {
+
+			for ( let dz = - 1; dz <= 1; dz ++ ) near.add( ( gx + dx ) + ',' + ( gz + dz ) );
+
+		}
+
+	}
+
 	const free = ( x, z ) => {
 
 		const [ gx, gz ] = cellOfWorld( x, z, cellSize );
 		return inArea( gx, gz, area ) && ! blocked.has( gx + ',' + gz );
 
 	};
+
+	const leavesTrack = ( pts ) => pts.some( ( [ x, z ] ) => ! near.has( cellOfWorld( x, z, cellSize ).join( ',' ) ) );
 
 	const out = [];
 
@@ -145,7 +161,7 @@ export function clipStreets( streets, trackCells, area, cellSize ) {
 		let run = [];
 		const flush = () => {
 
-			if ( run.length >= 2 ) out.push( { id: street.id, name: street.name, pts: run } );
+			if ( run.length >= 2 && leavesTrack( run ) ) out.push( { id: street.id, name: street.name, pts: run } );
 			run = [];
 
 		};

@@ -12,17 +12,19 @@ const CELL = 9.99 * 0.75; // CELL_RAW * GRID_SCALE in Track.js
 const fixture = JSON.parse( fs.readFileSync( new URL( './fixtures/sisseln.json', import.meta.url ) ) );
 
 // A real 10 m/cell loop around the fixture centre, placed like osm-track.html places it.
-function sisselnTrack() {
+// loop is the real street route (the loop's OSM nodes) in world units.
+function sisselnTrack( mode = 'auto' ) {
 
 	const project = makeProjection( fixture.bbox );
 	const graph = buildGraph( fixture, project );
 	const { ids } = perimeterLoop( graph, { x0: - 200, y0: - 200, x1: 200, y1: 200 } );
 	const pts = ids.map( ( id ) => graph.nodes.get( id ) );
-	const { cells } = rasterizeLoop( simplifyPolyline( [ ...pts, pts[ 0 ] ], 10 ).slice( 0, - 1 ), 10, 'auto' );
+	const { cells } = rasterizeLoop( simplifyPolyline( [ ...pts, pts[ 0 ] ], 10 ).slice( 0, - 1 ), 10, mode );
 	const { offX, offZ } = loopCenter( cells );
 	const param = { bbox: fixture.bbox, mpc: 10, offX, offZ };
 	const track = cells.map( ( [ gx, gz ] ) => [ gx - offX, gz - offZ ] );
-	return { param, track, area: viewArea( track, 8 ), features: osmFeatures( fixture, param, CELL ) };
+	const loop = pts.map( ( p ) => worldFromMeters( p.x, p.y, param, CELL ) );
+	return { param, track, loop, area: viewArea( track, 8 ), features: osmFeatures( fixture, param, CELL ) };
 
 }
 
@@ -101,6 +103,56 @@ test( 'clipStreets_realTrack_noRibbonOnATrackCell', () => {
 			assert.ok( ! blocked.has( cellOfWorld( mid[ 0 ], mid[ 1 ], CELL ).join( ',' ) ) );
 
 		}
+
+	}
+
+} );
+
+function distanceToSegment( [ px, pz ], [ ax, az ], [ bx, bz ] ) {
+
+	const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+	const t = len2 === 0 ? 0 : Math.max( 0, Math.min( 1, ( ( px - ax ) * dx + ( pz - az ) * dz ) / len2 ) );
+	return Math.hypot( px - ax - t * dx, pz - az - t * dz );
+
+}
+
+// Ribbon length (in cells) lying on the real loop route (within a tenth of a cell), i.e. the
+// loop's own street drawn again beside its tiles.
+function ghostRibbonCells( clipped, loop ) {
+
+	const onLoop = ( p ) => loop.some( ( a, i ) => distanceToSegment( p, a, loop[ ( i + 1 ) % loop.length ] ) < 0.1 * CELL );
+	let ghost = 0;
+
+	for ( const s of clipped ) {
+
+		for ( let i = 0; i < s.pts.length - 1; i ++ ) {
+
+			const [ a, b ] = [ s.pts[ i ], s.pts[ i + 1 ] ];
+			if ( onLoop( [ ( a[ 0 ] + b[ 0 ] ) / 2, ( a[ 1 ] + b[ 1 ] ) / 2 ] ) ) ghost += Math.hypot( b[ 0 ] - a[ 0 ], b[ 1 ] - a[ 1 ] ) / CELL;
+
+		}
+
+	}
+
+	return ghost;
+
+}
+
+// Before the fix: auto 39.4 cells, stairs 24.7 cells of ghost ribbon. After: auto 19.5, stairs 2.8
+// (what is left in auto are loop-street runs that also leave the neighbourhood at L-corners).
+test( 'clipStreets_realTrack_dropsRunsThatHugTheTrack', () => {
+
+	for ( const [ mode, maxGhost ] of [ [ 'auto', 20 ], [ 'stairs', 3 ] ] ) {
+
+		const { track, loop, area, features } = sisselnTrack( mode );
+		const clipped = clipStreets( features.streets, track, area, CELL );
+		assert.ok( ghostRibbonCells( clipped, loop ) <= maxGhost, mode );
+
+		const near = new Set();
+		for ( const [ gx, gz ] of track ) for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dz = - 1; dz <= 1; dz ++ ) near.add( ( gx + dx ) + ',' + ( gz + dz ) );
+		const leaves = ( s ) => s.pts.some( ( [ x, z ] ) => ! near.has( cellOfWorld( x, z, CELL ).join( ',' ) ) );
+		assert.ok( clipped.length > 0, mode );
+		assert.ok( clipped.every( leaves ), mode );
 
 	}
 
