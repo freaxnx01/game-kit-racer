@@ -142,7 +142,8 @@ async function init() {
 	}
 
 	// &osm= (from osm-track.html) adds the real surroundings around a generated track
-	const osmParam = customCells ? parseOsmParam( new URLSearchParams( window.location.search ).get( 'osm' ) ) : null;
+	const osmRaw = new URLSearchParams( window.location.search ).get( 'osm' );
+	const osmParam = customCells ? parseOsmParam( osmRaw ) : null;
 	const osmArea = osmParam ? viewArea( customCells, VIEW_MARGIN_CELLS ) : null;
 
 	// Compute track bounds and size physics/shadows to fit
@@ -259,6 +260,11 @@ async function init() {
 				hud.note( 'Surroundings unavailable' );
 
 			} );
+
+	} else if ( osmRaw !== null ) {
+
+		console.warn( 'OSM surroundings unavailable:', customCells ? 'malformed or too large &osm= value' : 'no valid ?map= track to place them around' );
+		hud.note( 'Surroundings unavailable' );
 
 	}
 
