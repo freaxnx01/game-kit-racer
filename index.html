@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="icon" href="favicon.png" sizes="32x32" type="image/png">
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 	<title>Racing</title>
@@ -41,6 +42,7 @@
 			z-index: 20;
 		}
 		#tracks-menu[hidden] { display: none; }
+		@media (max-width: 760px) { #game-nav { bottom: 60px !important; } #tracks-menu { bottom: 100px; } }
 		#tracks-menu a { display: block; padding: 8px 12px; border-radius: 9px; color: #1f2430; text-decoration: none; }
 		#tracks-menu a:hover { background: rgba(0,0,0,0.05); }
 		#tracks-menu a.current { background: #1f2430; color: #fff; }
@@ -101,6 +103,30 @@
 
 		button.addEventListener( 'click', ( e ) => { e.stopPropagation(); setOpen( menu.hidden ); } );
 		document.addEventListener( 'click', ( e ) => { if ( ! menu.contains( e.target ) ) setOpen( false ); } );
+	</script>
+	<script src="./version.js"></script>
+	<nav id="game-nav" aria-label="Game navigation" style="position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:30;display:flex;gap:12px;align-items:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:6px 11px;border-radius:8px;background:rgba(15,17,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:.55;transition:opacity .2s;white-space:nowrap" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+		<span id="version-badge" title="Version" style="color:#5a6072"></span>
+		<span style="color:#5a6072" aria-hidden="true">·</span>
+		<a href="https://github.freaxnx01.ch/games/" style="color:#8fd8e8;text-decoration:none">More Games…</a>
+		<span style="color:#5a6072" aria-hidden="true">·</span>
+		<a href="https://github.com/freaxnx01/game-kit-racer" target="_blank" rel="noopener" style="color:#8fd8e8;text-decoration:none">Source</a>
+		<span style="color:#5a6072" aria-hidden="true">·</span>
+		<a href="https://github.com/freaxnx01/game-kit-racer/issues/new?title=%5BFeedback%5D%20game-kit-racer&labels=feedback" target="_blank" rel="noopener" style="color:#8fd8e8;text-decoration:none">Feedback</a>
+	</nav>
+	<script>
+		// Version badge → CHANGELOG. Text comes only from window.GAME_VERSION so
+		// version.js stays the single source (never hardcode the literal here).
+		( function () {
+			var el = document.getElementById( 'version-badge' );
+			if ( ! el ) return;
+			var a = document.createElement( 'a' );
+			a.href = 'https://github.com/freaxnx01/game-kit-racer/blob/main/CHANGELOG.md';
+			a.target = '_blank'; a.rel = 'noopener'; a.title = 'Changelog';
+			a.textContent = 'v' + ( window.GAME_VERSION || '0.0.0' );
+			a.style.color = 'inherit'; a.style.textDecoration = 'none';
+			el.appendChild( a );
+		} )();
 	</script>
 	<script type="module" src="js/main.js"></script>
 </body>
