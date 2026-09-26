@@ -14,6 +14,7 @@ const STYLE = `
 		box-shadow: 0 10px 30px rgba(0,0,0,0.25); font: 400 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 		color: #1f2430; z-index: 21; box-sizing: border-box;
 	}
+	@media (max-width: 760px) { #mp-panel { bottom: 100px; max-height: calc(100vh - 184px); } }
 	#mp-panel[hidden], #mp-positions[hidden], #mp-countdown[hidden] { display: none; }
 	#mp-panel h2 { font-size: 15px; margin: 0 0 10px; }
 	#mp-panel label { display: block; margin: 10px 0 4px; color: #4a5260; }
@@ -102,7 +103,9 @@ export class Lobby {
 		style.textContent = STYLE;
 		document.head.appendChild( style );
 
-		this.button = el( 'a', { id: 'mp-button', className: 'corner-link', role: 'button', on: { click: ( e ) => { e.stopPropagation(); this.toggle(); } } } );
+		// The click reaches document, so index.html closes its Tracks menu; opening Tracks closes this panel.
+		this.button = el( 'a', { id: 'mp-button', className: 'corner-link', role: 'button', on: { click: () => this.toggle() } } );
+		document.getElementById( 'tracks-button' )?.addEventListener( 'click', () => this.close() );
 		this.panel = el( 'div', { id: 'mp-panel', hidden: true } );
 		this.positionsList = el( 'div' );
 		this.leaveButton = el( 'button', { on: { click: () => { if ( confirm( t( 'mp.leaveConfirm', this.lang ) ) ) this.mp.leave(); } } } );
@@ -138,6 +141,14 @@ export class Lobby {
 	toggle() {
 
 		this.open = ! this.open;
+		this.render( this.view, true );
+
+	}
+
+	close() {
+
+		if ( ! this.open ) return;
+		this.open = false;
 		this.render( this.view, true );
 
 	}

@@ -301,6 +301,9 @@ async function init() {
 			vehicle.spherePos.set( position[ 0 ], position[ 1 ], position[ 2 ] );
 			vehicle.prevModelPos.set( position[ 0 ], 0, position[ 2 ] );
 			vehicle.linearSpeed = 0;
+			vehicle.angularSpeed = 0;
+			vehicle.acceleration = 0;
+			vehicle.sphereVel.set( 0, 0, 0 );
 			vehicle.container.quaternion.setFromAxisAngle( _up, angle );
 
 		},

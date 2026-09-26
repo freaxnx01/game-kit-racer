@@ -1,0 +1,31 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+	/* The parts of index.html the multiplayer panel shares the screen with: corner links, Tracks menu, #game-nav. */
+	body { margin: 0; height: 100vh; background: #3a7; }
+	.corner-link { position: absolute; background: #fff; padding: 9px 18px; border-radius: 999px; font: 13px sans-serif; z-index: 20; }
+	#tracks-button { bottom: 12px; left: 12px; cursor: pointer; }
+	#tracks-menu { position: absolute; bottom: 56px; left: 12px; min-width: 250px; height: 120px; background: #fff; z-index: 20; }
+	#tracks-menu[hidden] { display: none; }
+	@media (max-width: 760px) { #game-nav { bottom: 60px !important; } #tracks-menu { bottom: 100px; } }
+</style></head><body>
+<a id="tracks-button" class="corner-link" role="button">Tracks</a>
+<div id="tracks-menu" hidden></div>
+<nav id="game-nav" style="position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:30;padding:6px 11px;background:#222;color:#fff">nav</nav>
+<script type="module">
+// Headless check of how the multiplayer panel and the Tracks menu share the screen (#7 item 3).
+// The Tracks menu script mirrors index.html's.
+import { Lobby } from '../../js/ui/Lobby.js';
+
+const menu = document.getElementById( 'tracks-menu' );
+const button = document.getElementById( 'tracks-button' );
+const setOpen = ( open ) => { menu.hidden = ! open; };
+button.addEventListener( 'click', ( e ) => { e.stopPropagation(); setOpen( menu.hidden ); } );
+document.addEventListener( 'click', ( e ) => { if ( ! menu.contains( e.target ) ) setOpen( false ); } );
+
+const lobby = new Lobby();
+lobby.bind( { host() {}, join() {} } );
+window.lobby = lobby;
+window.ready = true;
+</script>
+</body></html>
