@@ -214,6 +214,7 @@ export class MultiplayerRace {
 			finished: this.finished,
 			results: this.results,
 			message: this.message,
+			hostTrack: this.hostTrack,
 		};
 
 	}
@@ -243,6 +244,7 @@ export class MultiplayerRace {
 		this.finished = false;
 		this.results = null;
 		this.message = null;
+		this.hostTrack = null;   // link to the host's track after a setup for another track
 		this.rtt = 0;
 		this.lastPing = - Infinity;
 		this.lastState = - Infinity;
@@ -263,11 +265,19 @@ export class MultiplayerRace {
 
 	inviteLink( code ) {
 
+		return buildInviteLink( this.trackUrl( this.game.mapParam, this.game.osmParam ), code );
+
+	}
+
+	// This page's URL showing the given track (and OSM surroundings, when set).
+	trackUrl( map, osm ) {
+
 		const url = new URL( this.game.pageUrl );
 		url.search = '';
-		url.searchParams.set( 'map', this.game.mapParam );
-		if ( this.game.osmParam ) url.searchParams.set( 'osm', this.game.osmParam );
-		return buildInviteLink( url.href.replace( /%2C/g, ',' ), code );
+		url.hash = '';
+		url.searchParams.set( 'map', map );
+		if ( osm ) url.searchParams.set( 'osm', osm );
+		return url.href.replace( /%2C/g, ',' );
 
 	}
 
@@ -356,7 +366,8 @@ export class MultiplayerRace {
 			case 'setup': {
 
 				const me = this.roster.find( ( p ) => p.id === this.you );
-				if ( ! me || msg.map !== this.game.mapParam ) return;
+				if ( ! me ) return;
+				if ( msg.map !== this.game.mapParam ) return this.otherTrack( msg );
 				this.laps = msg.laps;
 				return this.beginCountdown( me.slot, now + guestStartDelay( msg.startIn, this.rtt ) );
 
@@ -386,6 +397,17 @@ export class MultiplayerRace {
 				return;
 
 		}
+
+	}
+
+	// The host started on a track this page is not showing: leave (the host sees "left" instead of
+	// racing a truck that never moves) and offer a link to the host's track.
+	otherTrack( setup ) {
+
+		const link = this.trackUrl( setup.map, setup.osm );
+		this.leave();
+		this.hostTrack = link;
+		this.say( 'mp.otherTrack' );
 
 	}
 

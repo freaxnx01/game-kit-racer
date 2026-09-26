@@ -180,6 +180,25 @@ test( 'guestSetup_startsCountdownOnItsSlotMinusHalfRtt', async () => {
 
 } );
 
+test( 'guestSetup_otherTrack_leavesAndOffersTheHostTrack', async () => {
+
+	const t = setup();
+	t.game.pageUrl = 'https://example.test/game/index.html?map=fYYN#join=KR1.offer-g1';
+	await t.mp.join( 'KR1.offer-g1', 'Bo' );
+	t.session().connect( 'h' );
+	t.session().deliver( 'h', { type: 'roster', you: 'g1', players: [ { id: 'h', name: 'Ana', slot: 0, connected: true }, { id: 'g1', name: 'Bo', slot: 1, connected: true } ] } );
+	t.session().deliver( 'h', { type: 'setup', map: 'OtherTrack', osm: '47.548,7.98,47.556,7.995,10,-1,-3', laps: 2, startIn: 3000 } );
+
+	const view = t.mp.view();
+	assert.equal( view.role, null );
+	assert.equal( view.phase, 'lobby' );
+	assert.equal( view.message.key, 'mp.otherTrack' );
+	assert.equal( view.hostTrack, 'https://example.test/game/index.html?map=OtherTrack&osm=47.548,7.98,47.556,7.995,10,-1,-3' );
+	assert.ok( t.session().sent.some( ( s ) => s.to === 'h' && s.msg.type === 'leave' ) );
+	assert.equal( t.game.hold, false );
+
+} );
+
 test( 'noConnectionAfterTwentySeconds_showsStrictNetworkHint', async () => {
 
 	const t = setup();

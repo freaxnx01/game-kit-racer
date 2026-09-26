@@ -27,6 +27,7 @@ const STYLE = `
 	#mp-panel .invite { margin-top: 10px; padding: 10px; background: #f5f6f8; border-radius: 10px; }
 	#mp-panel .muted { color: #6b7280; font-size: 12px; margin-top: 6px; }
 	#mp-panel .message { color: #b45309; margin-top: 10px; }
+	#mp-panel a.host-track { display: inline-block; margin-top: 8px; color: #1f2430; font-weight: 600; }
 	#mp-panel ul { list-style: none; padding: 0; margin: 6px 0 0; }
 	#mp-panel li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
 	#mp-panel table { width: 100%; border-collapse: collapse; margin-top: 6px; }
@@ -149,13 +150,14 @@ export class Lobby {
 
 	render( view, force = false ) {
 
+		const newHostTrack = view.hostTrack && view.hostTrack !== this.view.hostTrack;
 		this.view = view;
 		const racing = view.phase === 'countdown' || view.phase === 'racing';
 		if ( racing ) this.open = false;
-		if ( view.phase === 'results' ) this.open = true;
+		if ( view.phase === 'results' || newHostTrack ) this.open = true;
 
 		const key = JSON.stringify( [ this.open, this.joining, this.lang, view.role, view.phase, view.you, view.laps, view.players,
-			view.invites?.map( ( i ) => [ i.peerId, i.secondsLeft === 0 ] ), view.answerCode, view.results, view.message, view.finished ] );
+			view.invites?.map( ( i ) => [ i.peerId, i.secondsLeft === 0 ] ), view.answerCode, view.results, view.message, view.hostTrack, view.finished ] );
 
 		if ( force || key !== this.structure ) {
 
@@ -181,6 +183,7 @@ export class Lobby {
 		else parts.push( ...this.guestLobby( view ) );
 
 		if ( view.message ) parts.push( el( 'div', { className: 'message', text: t( view.message.key, L, view.message.vars ) } ) );
+		if ( view.hostTrack ) parts.push( el( 'a', { className: 'host-track', href: view.hostTrack, text: t( 'mp.openHostTrack', L ) } ) );
 		if ( view.role ) parts.push( el( 'button', { text: t( 'mp.leave', L ), on: { click: () => this.mp.leave() } } ) );
 		return parts;
 
