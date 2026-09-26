@@ -4,7 +4,7 @@
 // their content and focus; timers and positions update in place.
 
 import { t, funnyName } from './strings.js';
-import { MAX_LAPS } from '../net/Protocol.js';
+import { MAX_LAPS, cleanName } from '../net/Protocol.js';
 
 const STYLE = `
 	#mp-button { bottom: 12px; left: 100px; cursor: pointer; }
@@ -353,8 +353,7 @@ export class Lobby {
 
 	name() {
 
-		const name = this.nameInput.value.replace( /[ -]/g, '' ).trim().slice( 0, 16 );
-		return name || funnyName();
+		return cleanName( this.nameInput.value ) ?? funnyName();
 
 	}
 
