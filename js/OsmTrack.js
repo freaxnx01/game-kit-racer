@@ -9,7 +9,7 @@
 // World mapping: +X = east, +Z = south (gz = -north). One grid cell = `metersPerCell` metres.
 // Grid coordinates must stay within -128..127 because of the 1-byte cell codec in Track.js.
 
-export const DEFAULT_HIGHWAYS = 'primary|secondary|tertiary|unclassified|residential|living_street|service|track';
+export const DEFAULT_HIGHWAYS = 'primary|secondary|tertiary|unclassified|residential|living_street|service|track|pedestrian';
 
 // bbox = [south, west, north, east]. With { buildings: true } the query also returns building footprints.
 export function overpassQuery( bbox, highways = DEFAULT_HIGHWAYS, { buildings = false } = {} ) {
@@ -126,6 +126,13 @@ export function makeProjection( bbox ) {
 
 }
 
+// Display name of a road: its name, else the bridge's name (the Holzbrücke only has bridge:name).
+export function wayName( tags ) {
+
+	return tags?.name ?? tags?.[ 'bridge:name' ] ?? '';
+
+}
+
 export function buildGraph( osm, project ) {
 
 	const nodes = new Map();
@@ -142,7 +149,7 @@ export function buildGraph( osm, project ) {
 
 	for ( const el of osm.elements ) {
 
-		if ( el.type !== 'way' || ! el.nodes || ! el.tags?.highway ) continue; // roads only — buildings share the response
+		if ( el.type !== 'way' || ! el.nodes || ! el.tags?.highway || el.tags.area === 'yes' ) continue; // roads only — buildings and squares share the response
 
 		const pts = [];
 
@@ -164,7 +171,7 @@ export function buildGraph( osm, project ) {
 
 		}
 
-		ways.push( { id: el.id, name: el.tags?.name ?? '', highway: el.tags?.highway ?? '', pts } );
+		ways.push( { id: el.id, name: wayName( el.tags ), highway: el.tags.highway, pts } );
 
 	}
 

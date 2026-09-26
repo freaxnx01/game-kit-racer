@@ -5,9 +5,22 @@ import fs from 'node:fs';
 import {
 	overpassQuery, fetchOverpass, OVERPASS_MIRRORS, buildGraph, makeProjection,
 	perimeterLoop, simplifyPolyline, rasterizeLoop, loopToTrackCells, trackStats,
+	DEFAULT_HIGHWAYS,
 } from '../js/OsmTrack.js';
 
 const fixture = JSON.parse( fs.readFileSync( new URL( './fixtures/sisseln.json', import.meta.url ) ) );
+
+// Four nodes on a ~76 m × 111 m block; ways = [ [ id, nodeIds, tags ], … ]
+const MINI_BBOX = [ 46.999, 7.999, 47.002, 8.002 ];
+const miniOsm = ( ways ) => ( {
+	elements: [
+		{ type: 'node', id: 1, lat: 47.0, lon: 8.0 },
+		{ type: 'node', id: 2, lat: 47.0, lon: 8.001 },
+		{ type: 'node', id: 3, lat: 47.001, lon: 8.001 },
+		{ type: 'node', id: 4, lat: 47.001, lon: 8.0 },
+		...ways.map( ( [ id, nodes, tags ] ) => ( { type: 'way', id, nodes, tags } ) ),
+	],
+} );
 
 // In-memory stand-in for the Web Storage API (length, key, getItem, setItem, removeItem).
 const memoryStorage = () => {
@@ -163,5 +176,37 @@ test( 'rasterizeLoop_auto_cutsCornersSomewhere', () => {
 	const graph = buildGraph( fixture, makeProjection( fixture.bbox ) );
 	const pts = loopPoints( graph, 200, 10 );
 	assert.ok( corners( rasterizeLoop( pts, 10, 'auto' ).cells ) < corners( rasterizeLoop( pts, 10, 'stairs' ).cells ) );
+
+} );
+
+test( 'DEFAULT_HIGHWAYS_oldTownLanes_includesPedestrianButNotFootpaths', () => {
+
+	const types = DEFAULT_HIGHWAYS.split( '|' );
+	assert.ok( types.includes( 'pedestrian' ) );
+	assert.ok( ! types.includes( 'footway' ) && ! types.includes( 'path' ) );
+
+} );
+
+test( 'buildGraph_pedestrianSquareMappedAsArea_isNotARoad', () => {
+
+	const osm = miniOsm( [
+		[ 10, [ 1, 2 ], { highway: 'pedestrian', name: 'Gasse' } ],
+		[ 11, [ 1, 2, 3, 4, 1 ], { highway: 'pedestrian', area: 'yes', name: 'Münsterplatz' } ],
+	] );
+	const graph = buildGraph( osm, makeProjection( MINI_BBOX ) );
+	assert.deepEqual( graph.ways.map( ( w ) => w.id ), [ 10 ] );
+	assert.equal( graph.nodes.get( 3 ).adj.length, 0 );
+
+} );
+
+test( 'buildGraph_unnamedBridge_usesBridgeName', () => {
+
+	const osm = miniOsm( [
+		[ 10, [ 1, 2 ], { highway: 'pedestrian', bridge: 'covered', 'bridge:name': 'Holzbrücke Bad Säckingen' } ],
+		[ 11, [ 2, 3 ], { highway: 'residential', name: 'Rheinbrückstrasse', 'bridge:name': 'Other' } ],
+		[ 12, [ 3, 4 ], { highway: 'residential' } ],
+	] );
+	const graph = buildGraph( osm, makeProjection( MINI_BBOX ) );
+	assert.deepEqual( graph.ways.map( ( w ) => w.name ), [ 'Holzbrücke Bad Säckingen', 'Rheinbrückstrasse', '' ] );
 
 } );
