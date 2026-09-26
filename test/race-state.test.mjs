@@ -86,7 +86,7 @@ test( 'recordFinish_beforeAllLaps_isRejected_afterwardsUsesAcceptedTimes', () =>
 
 } );
 
-test( 'tick_everyoneFinished_showsResultsInTimeOrder', () => {
+test( 'tick_everyoneFinished_showsResultsInHostObservedFinishOrder', () => {
 
 	const r = race( [ 'h', 'g1', 'g2' ] );
 	r.start( 0 ); r.tick( COUNTDOWN_MS );
@@ -95,7 +95,27 @@ test( 'tick_everyoneFinished_showsResultsInTimeOrder', () => {
 	assert.equal( r.tick( 6000 ), PHASE.RACING );
 	driveLaps( r, 'g1', 2, FAST + 2 ); r.recordFinish( 'g1', 7000 );
 	assert.equal( r.tick( 7000 ), PHASE.RESULTS );
-	assert.deepEqual( r.results().map( ( row ) => [ row.id, row.place ] ), [ [ 'g2', 1 ], [ 'g1', 2 ], [ 'h', 3 ] ] );
+	assert.deepEqual( r.results().map( ( row ) => [ row.id, row.place ] ), [ [ 'g2', 1 ], [ 'h', 2 ], [ 'g1', 3 ] ] );
+
+} );
+
+test( 'results_guestReportsFastLapsButFinishesLast_isPlacedLast', () => {
+
+	const r = race( [ 'h', 'g1' ] );
+	r.start( 0 ); r.tick( COUNTDOWN_MS );
+	driveLaps( r, 'h', 2, FAST + 20 ); r.recordFinish( 'h', 60000 );
+	driveLaps( r, 'g1', 2, FAST ); r.recordFinish( 'g1', 75000 );
+	assert.deepEqual( r.results().map( ( row ) => [ row.id, row.place, row.total ] ), [ [ 'h', 1, 2 * FAST + 40 ], [ 'g1', 2, 2 * FAST ] ] );
+
+} );
+
+test( 'results_sameFinishMoment_fallsBackToReportedTotal', () => {
+
+	const r = race( [ 'h', 'g1' ] );
+	r.start( 0 ); r.tick( COUNTDOWN_MS );
+	driveLaps( r, 'h', 2, FAST + 3 ); r.recordFinish( 'h', 50000 );
+	driveLaps( r, 'g1', 2, FAST + 1 ); r.recordFinish( 'g1', 50000 );
+	assert.deepEqual( r.results().map( ( row ) => row.id ), [ 'g1', 'h' ] );
 
 } );
 

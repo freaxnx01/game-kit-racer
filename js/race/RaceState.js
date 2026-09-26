@@ -51,7 +51,7 @@ export class RaceState {
 		this.minLap = minLapSeconds( cellCount, cellSize );
 		this.laps = laps;
 		this.phase = PHASE.LOBBY;
-		this.players = [];        // { id, name, slot, connected, left, laps, lapTimes, total, best }
+		this.players = [];        // { id, name, slot, connected, left, laps, lapTimes, total, best, finishedAt }
 		this.startAt = null;
 		this.firstFinishAt = null;
 
@@ -150,18 +150,21 @@ export class RaceState {
 		if ( ! p || p.total !== null || p.laps !== this.laps ) return false;
 		p.total = p.lapTimes.reduce( ( a, b ) => a + b, 0 );
 		p.best = Math.min( ...p.lapTimes );
+		p.finishedAt = now;
 		if ( this.firstFinishAt === null ) this.firstFinishAt = now;
 		return true;
 
 	}
 
-	// Live order: finished players by total time, then everyone else by laps and progress (0..1).
+	// Live order: finished players by when the host saw them finish (reported totals only break ties —
+	// a guest's lap times are not trusted), then everyone else by laps and progress (0..1).
 	standings( progressById ) {
 
 		const key = ( p ) => p.laps + ( progressById.get( p.id ) ?? 0 );
 		return this.players.filter( ( p ) => ! p.left ).slice().sort( ( a, b ) => {
 
-			if ( a.total !== null || b.total !== null ) return ( a.total ?? Infinity ) - ( b.total ?? Infinity );
+			if ( a.total !== null && b.total !== null ) return a.finishedAt - b.finishedAt || a.total - b.total;
+			if ( a.total !== null || b.total !== null ) return a.total === null ? 1 : - 1;
 			return key( b ) - key( a );
 
 		} ).map( ( p ) => p.id );
@@ -203,6 +206,6 @@ export class RaceState {
 
 function freshRace() {
 
-	return { laps: 0, lapTimes: [], total: null, best: null };
+	return { laps: 0, lapTimes: [], total: null, best: null, finishedAt: null };
 
 }
