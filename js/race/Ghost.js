@@ -2,6 +2,17 @@
 // localStorage, sampled by lap time so the ghost runs in sync with the lap timer. Pure (no three.js).
 // A sample is [ t, px, py, pz, qx, qy, qz, qw ]: lap time in seconds, the truck's position and rotation.
 
+export const MAX_LAP_SECONDS = 300;  // longer laps are not kept as a ghost
+const STORAGE_PREFIX = 'racing.ghost.';
+const FORMAT = 1;
+const STRIDE = 8;
+
+export function ghostStorageKey( trackId ) {
+
+	return STORAGE_PREFIX + ( trackId || 'default' );
+
+}
+
 // Pose at lap time t: blend between the samples around t, hold the first before it starts,
 // null once the ghost has finished its lap (or when there is no ghost).
 export function sampleGhost( ghost, t ) {
@@ -42,5 +53,77 @@ function nlerp( a, b, k ) {
 	const q = a.map( ( x, i ) => x + ( sign * b[ i ] - x ) * k );
 	const len = Math.hypot( ...q ) || 1;
 	return q.map( ( x ) => x / len );
+
+}
+
+const round = ( x ) => Math.round( x * 1000 ) / 1000;
+
+export function encodeGhost( ghost ) {
+
+	return JSON.stringify( { v: FORMAT, time: round( ghost.time ), s: ghost.samples.flat().map( round ) } );
+
+}
+
+// Stored text → ghost, or null for anything that is not a well-formed ghost.
+export function decodeGhost( text ) {
+
+	let data;
+	try {
+
+		data = JSON.parse( text );
+
+	} catch {
+
+		return null;
+
+	}
+
+	if ( ! isValidData( data ) ) return null;
+
+	const samples = [];
+	for ( let i = 0; i < data.s.length; i += STRIDE ) samples.push( data.s.slice( i, i + STRIDE ) );
+	return { time: data.time, samples };
+
+}
+
+function isValidData( data ) {
+
+	if ( ! data || data.v !== FORMAT || ! Array.isArray( data.s ) ) return false;
+	if ( ! Number.isFinite( data.time ) || data.time <= 0 || data.time > MAX_LAP_SECONDS ) return false;
+	if ( data.s.length < STRIDE * 2 || data.s.length % STRIDE !== 0 ) return false;
+	if ( ! data.s.every( Number.isFinite ) ) return false;
+
+	for ( let i = STRIDE; i < data.s.length; i += STRIDE ) {
+
+		if ( data.s[ i ] < data.s[ i - STRIDE ] ) return false;
+
+	}
+
+	return true;
+
+}
+
+// storage defaults to the browser's localStorage; tests pass a stand-in.
+export function loadGhost( key, storage ) {
+
+	try {
+
+		return decodeGhost( ( storage || globalThis.localStorage ).getItem( key ) );
+
+	} catch {
+
+		return null;
+
+	}
+
+}
+
+export function saveGhost( key, ghost, storage ) {
+
+	try {
+
+		( storage || globalThis.localStorage ).setItem( key, encodeGhost( ghost ) );
+
+	} catch {}
 
 }
