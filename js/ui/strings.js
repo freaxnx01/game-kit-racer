@@ -45,6 +45,16 @@ export const STRINGS = {
 		'mp.connecting': 'Connecting…',
 		'mp.close': 'Close',
 		'mp.noFinish': 'This track has no finish line — pick another one to race.',
+		'cpu.button': 'vs CPU',
+		'cpu.title': 'Race the CPU',
+		'cpu.opponents': 'CPU trucks',
+		'cpu.difficulty': 'Difficulty',
+		'cpu.easy': 'Easy',
+		'cpu.medium': 'Medium',
+		'cpu.hard': 'Hard',
+		'cpu.quit': 'Quit race',
+		'cpu.freeDrive': 'Free driving',
+		'cpu.noLoop': 'CPU trucks need one closed circuit with a finish line — pick another track.',
 	},
 
 	de: {
@@ -89,6 +99,16 @@ export const STRINGS = {
 		'mp.connecting': 'Verbinde…',
 		'mp.close': 'Schliessen',
 		'mp.noFinish': 'Diese Strecke hat keine Ziellinie — wähl eine andere zum Rennen.',
+		'cpu.button': 'Gegen CPU',
+		'cpu.title': 'Gegen den Computer fahren',
+		'cpu.opponents': 'CPU-Trucks',
+		'cpu.difficulty': 'Schwierigkeit',
+		'cpu.easy': 'Leicht',
+		'cpu.medium': 'Mittel',
+		'cpu.hard': 'Schwer',
+		'cpu.quit': 'Rennen beenden',
+		'cpu.freeDrive': 'Freies Fahren',
+		'cpu.noLoop': 'CPU-Trucks brauchen einen geschlossenen Rundkurs mit Ziellinie — wähl eine andere Strecke.',
 	},
 
 };
