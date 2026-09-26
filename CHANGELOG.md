@@ -8,6 +8,9 @@ All notable changes to this project are documented here, following
 
 ### Added
 
+- Ghost: after your first full lap, a see-through truck replays your fastest
+  lap on that track, in step with the lap timer — race it to beat your best.
+  It is saved per track, so it is waiting for you next time.
 - Mini map in the top-right corner on every track, showing where you are.
 - Tracks built from OpenStreetMap now show the real buildings and side streets
   around the road, and the name of the street you are driving on.
