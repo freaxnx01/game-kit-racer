@@ -6,7 +6,7 @@ import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, e
 import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
+import { buildTrack, decodeCells, encodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { DriftMarks } from './DriftMarks.js';
@@ -16,6 +16,11 @@ import { ColorMapGLTFLoader } from './Loader.js';
 import { Hud } from './OsmHud.js';
 import { parseOsmParam, viewArea } from './OsmData.js';
 import { loadSurroundings, VIEW_MARGIN_CELLS } from './OsmScene.js';
+import { gridSlots } from './race/RaceState.js';
+import { Opponents } from './race/Opponents.js';
+import { MultiplayerRace } from './race/MultiplayerRace.js';
+import { Lobby } from './ui/Lobby.js';
+import { parseInviteHash } from './net/Signal.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -270,6 +275,53 @@ async function init() {
 
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
+	const _up = new THREE.Vector3( 0, 1, 0 );
+
+	// Multiplayer (#1): other players' trucks, the lobby and the race controller.
+	const raceCells = customCells || TRACK_CELLS;
+	const finishCell = raceCells.find( ( c ) => c[ 2 ] === 'track-finish' );
+	const trackKeys = new Set( raceCells.map( ( c ) => c[ 0 ] + ',' + c[ 1 ] ) );
+	const slots = finishCell ? gridSlots( finishCell, cellSize, ( gx, gz ) => trackKeys.has( gx + ',' + gz ) ) : [];
+	let holdInput = false;
+
+	const game = {
+		trackCells: raceCells,
+		cellSize,
+		pageUrl: window.location.href,
+		mapParam: mapParam || encodeCells( TRACK_CELLS ),
+		osmParam: osmRaw && /^[-0-9.,]{13,120}$/.test( osmRaw ) ? osmRaw : null,
+		lapTimer,
+		opponents: new Opponents( scene, world, models ),
+		placeOnSlot( slot ) {
+
+			const { position, angle } = slots[ slot ];
+			rigidBody.setPosition( world, sphereBody, position, true );
+			rigidBody.setLinearVelocity( world, sphereBody, [ 0, 0, 0 ] );
+			rigidBody.setAngularVelocity( world, sphereBody, [ 0, 0, 0 ] );
+			vehicle.spherePos.set( position[ 0 ], position[ 1 ], position[ 2 ] );
+			vehicle.prevModelPos.set( position[ 0 ], 0, position[ 2 ] );
+			vehicle.linearSpeed = 0;
+			vehicle.container.quaternion.setFromAxisAngle( _up, angle );
+
+		},
+		setHold( hold ) {
+
+			holdInput = hold;
+
+		},
+		localState() {
+
+			const s = vehicle.spherePos, q = vehicle.container.quaternion, v = vehicle.sphereVel;
+			return { p: [ s.x, s.y, s.z ], q: [ q.x, q.y, q.z, q.w ], v: [ v.x, v.y, v.z ] };
+
+		},
+	};
+
+	const lobby = new Lobby( { canRace: !! finishCell } );
+	const multiplayer = new MultiplayerRace( game, { onChange: ( view ) => lobby.render( view ) } );
+	lobby.bind( multiplayer );
+	const invite = parseInviteHash( window.location.hash );
+	if ( invite ) lobby.openJoin( invite );
 
 	const contactListener = {
 		onContactAdded( bodyA, bodyB ) {
@@ -296,7 +348,9 @@ async function init() {
 		const dt = Math.min( timer.getDelta(), 1 / 30 );
 
 		const input = controls.update();
+		if ( holdInput ) Object.assign( input, { x: 0, z: 0, touchActive: false } );
 
+		multiplayer.update( dt );
 		updateWorld( world, contactListener, dt );
 
 		vehicle.update( dt, input );

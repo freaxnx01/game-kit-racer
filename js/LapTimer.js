@@ -58,6 +58,11 @@ export class LapTimer {
 
 		this.prevForwardProj = null;
 
+		// Multiplayer: onLap( lapNumber, lapTime ) after every completed lap; persist = false keeps race
+		// laps out of the single-player best-lap storage.
+		this.onLap = null;
+		this.persist = true;
+
 		this.cellSize = CELL_RAW * GRID_SCALE;
 		this.requiredCells = new Set();
 		this.visitedCells = new Set();
@@ -170,12 +175,13 @@ export class LapTimer {
 	completeLap() {
 
 		const isBest = this.bestLap === null || this.currentLapTime < this.bestLap;
+		const lapTime = this.currentLapTime;
 
 		this.lastLap = this.currentLapTime;
 		if ( isBest ) {
 
 			this.bestLap = this.currentLapTime;
-			saveBest( this.storageKey, this.bestLap );
+			if ( this.persist ) saveBest( this.storageKey, this.bestLap );
 
 		}
 		this.lap += 1;
@@ -190,6 +196,54 @@ export class LapTimer {
 			[ { color }, { color }, { color: '#fff' } ],
 			{ duration: 1200, easing: 'ease-out' }
 		);
+
+		this.onLap?.( this.lap - 1, lapTime );
+
+	}
+
+	// Fraction (0..1) of this lap's cells visited so far — for live race positions.
+	progress() {
+
+		return this.requiredCells.size ? this.visitedCells.size / this.requiredCells.size : 0;
+
+	}
+
+	// Clean slate for a multiplayer race: lap 1, no times, nothing stored. The clock starts with startRace().
+	resetForRace() {
+
+		this.persist = false;
+		this.reset( null );
+
+	}
+
+	startRace() {
+
+		this.running = true;
+
+	}
+
+	// Back to single player: stored best lap again.
+	resetForSolo() {
+
+		this.persist = true;
+		this.reset( loadBest( this.storageKey ) );
+
+	}
+
+	reset( bestLap ) {
+
+		this.lap = 1;
+		this.bestLap = bestLap;
+		this.lastLap = null;
+		this.currentLapTime = 0;
+		this.running = false;
+		this.prevForwardProj = null;
+		this.visitedCells.clear();
+		if ( ! this.enabled ) return;
+		this.lapEl.textContent = this.lap;
+		this.currentEl.textContent = formatTime( 0 );
+		this.lastEl.textContent = formatTime( null );
+		this.bestEl.textContent = formatTime( this.bestLap );
 
 	}
 

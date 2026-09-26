@@ -1,0 +1,53 @@
+<!DOCTYPE html><html><head>
+<script type="importmap">{ "imports": {
+	"three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+	"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+	"crashcat": "https://esm.sh/crashcat@0.0.3"
+} }</script></head><body>
+<script type="module">
+// Headless physics check for Opponents.js: a remote truck driving into a resting player truck pushes it.
+import * as THREE from 'three';
+import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, enableCollision, registerAll, updateWorld, rigidBody, box, MotionType } from 'crashcat';
+import { createSphereBody } from '../../js/Physics.js';
+import { Opponents } from '../../js/race/Opponents.js';
+
+registerAll();
+const settings = createWorldSettings();
+settings.gravity = [ 0, - 9.81, 0 ];
+const bplMoving = addBroadphaseLayer( settings ), bplStatic = addBroadphaseLayer( settings );
+const olMoving = addObjectLayer( settings, bplMoving ), olStatic = addObjectLayer( settings, bplStatic );
+enableCollision( settings, olMoving, olStatic );
+enableCollision( settings, olMoving, olMoving );
+const world = createWorld( settings );
+world._OL_MOVING = olMoving;
+world._OL_STATIC = olStatic;
+rigidBody.create( world, { shape: box.create( { halfExtents: [ 50, 0.01, 50 ] } ), motionType: MotionType.STATIC, objectLayer: olStatic, position: [ 0, - 0.125, 0 ], friction: 5, restitution: 0 } );
+
+const player = createSphereBody( world, [ 0, 0.5, 0 ] );
+const scene = new THREE.Scene();
+const opponents = new Opponents( scene, world, {} );
+opponents.add( 'g1', 'Bo', 0 );
+
+// Remote truck drives along +x from x = -3 at 6 units/s, straight through the player's spot.
+const dt = 1 / 60;
+let now = 0;
+for ( let i = 0; i < 90; i ++ ) {
+
+	now += dt * 1000;
+	const x = - 3 + 6 * now / 1000;
+	opponents.push( 'g1', { p: [ x, 0.5, 0.05 ], q: [ 0, 0, 0, 1 ], v: [ 6, 0, 0 ] }, now );
+	opponents.update( dt, now );
+	updateWorld( world, undefined, dt );
+
+}
+
+const truck = opponents.trucks.get( 'g1' );
+window.result = {
+	playerX: + player.position[ 0 ].toFixed( 2 ),
+	opponentX: + truck.body.position[ 0 ].toFixed( 2 ),
+	modelVisible: truck.group.visible,
+	children: scene.children.length,
+};
+opponents.remove( 'g1' );
+window.result.afterRemove = scene.children.length;
+</script></body></html>
