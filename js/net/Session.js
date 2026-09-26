@@ -1,9 +1,9 @@
 // Session.js — WebRTC peers for a star-shaped race: the host holds one connection per guest, a guest
 // holds one connection to the host. Signaling is manual (Signal.js codes); every inbound message
-// passes Protocol.parseMessage before anyone sees it.
+// passes Protocol.readMessage before anyone sees it.
 
 import { encodeSignal, decodeSignal, isOfferExpired, SignalError } from './Signal.js';
-import { parseMessage } from './Protocol.js';
+import { readMessage } from './Protocol.js';
 
 export const ICE_SERVERS = [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ];
 const ICE_GATHER_MS = 3500;
@@ -182,10 +182,10 @@ export class Session {
 
 		channel.addEventListener( 'message', ( e ) => {
 
-			const msg = parseMessage( e.data, this.bounds );
+			const { kind, msg } = readMessage( e.data, this.bounds );
 
-			if ( msg ) return this.onMessage( peerId, msg );
-			if ( ++ peer.drops > MAX_DROPS ) this.close( peerId, true, 'invalid' );
+			if ( kind === 'deliver' ) return this.onMessage( peerId, msg );
+			if ( kind === 'drop' && ++ peer.drops > MAX_DROPS ) this.close( peerId, true, 'invalid' );
 
 		} );
 

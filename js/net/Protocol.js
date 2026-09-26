@@ -1,7 +1,7 @@
 // Protocol.js — multiplayer messages and the validator every inbound message must pass. Pure.
 //
-// Messages are JSON objects with a `type`. Anything that fails validation is dropped by the caller
-// (Session counts drops and disconnects a peer after too many). Unknown extra fields are ignored.
+// Messages are JSON objects with a `type`. Session drops malformed ones (and disconnects a peer after
+// too many) but only ignores a `state` outside the track area. Unknown extra fields are ignored.
 
 export const MAX_MESSAGE_CHARS = 2048;
 export const MAX_SETUP_CHARS = 16384;   // setup carries the ?map= string, up to ~1500 cells
@@ -42,7 +42,7 @@ const VALIDATORS = {
 		isInt( m.laps, 1, MAX_LAPS ) && isInt( m.startIn, 0, 10000 ),
 	ping: ( m ) => isNum( m.t, 0, Number.MAX_SAFE_INTEGER ),
 	pong: ( m ) => isNum( m.t, 0, Number.MAX_SAFE_INTEGER ),
-	state: ( m, bounds ) => isId( m.id ) && isVec( m.p, 3, 1e6 ) && inBounds( m.p, bounds ) && isVec( m.q, 4, 1.01 ) &&
+	state: ( m ) => isId( m.id ) && isVec( m.p, 3, 1e6 ) && isVec( m.q, 4, 1.01 ) &&
 		isVec( m.v, 3, MAX_SPEED ) && isInt( m.lap, 0, MAX_LAPS + 1 ) && isNum( m.progress, 0, 1 ),
 	lap: ( m ) => isInt( m.lap, 1, MAX_LAPS ) && isNum( m.time, 0.001, MAX_TIME ),
 	finish: ( m ) => isNum( m.total, 0.001, MAX_TIME ) && isNum( m.best, 0.001, MAX_TIME ),
@@ -54,8 +54,8 @@ const VALIDATORS = {
 
 };
 
-// Is this object a well-formed message? bounds = { minX, maxX, minZ, maxZ } in world units (for `state`).
-export function validate( msg, bounds ) {
+// Is this object a well-formed message? Positions are not checked against the track area here.
+function wellFormed( msg ) {
 
 	if ( msg === null || typeof msg !== 'object' || Array.isArray( msg ) ) return false;
 	const check = Object.hasOwn( VALIDATORS, msg.type ) ? VALIDATORS[ msg.type ] : null;
@@ -63,7 +63,7 @@ export function validate( msg, bounds ) {
 
 	try {
 
-		return check( msg, bounds ) === true;
+		return check( msg ) === true;
 
 	} catch {
 
@@ -73,8 +73,22 @@ export function validate( msg, bounds ) {
 
 }
 
-// Raw data-channel text → validated message, or null.
-export function parseMessage( text, bounds ) {
+// A well-formed `state` whose truck is outside the track area (it drove or fell off the map).
+function outOfBounds( msg, bounds ) {
+
+	return msg.type === 'state' && ! inBounds( msg.p, bounds );
+
+}
+
+// Is this object a well-formed message? bounds = { minX, maxX, minZ, maxZ } in world units (for `state`).
+export function validate( msg, bounds ) {
+
+	return wellFormed( msg ) && ! outOfBounds( msg, bounds );
+
+}
+
+// Raw text → parsed JSON within the size limits, or null.
+function decode( text ) {
 
 	if ( typeof text !== 'string' || text.length > MAX_SETUP_CHARS ) return null;
 
@@ -91,6 +105,25 @@ export function parseMessage( text, bounds ) {
 	}
 
 	if ( text.length > MAX_MESSAGE_CHARS && msg?.type !== 'setup' ) return null;
-	return validate( msg, bounds ) ? msg : null;
+	return msg;
+
+}
+
+// Raw data-channel text → { kind: 'deliver', msg }, { kind: 'ignore' } for a well-formed `state`
+// outside the track area (not the sender's fault), or { kind: 'drop' } for anything malformed.
+export function readMessage( text, bounds ) {
+
+	const msg = decode( text );
+	if ( ! wellFormed( msg ) ) return { kind: 'drop' };
+	if ( outOfBounds( msg, bounds ) ) return { kind: 'ignore' };
+	return { kind: 'deliver', msg };
+
+}
+
+// Raw data-channel text → validated message, or null.
+export function parseMessage( text, bounds ) {
+
+	const read = readMessage( text, bounds );
+	return read.kind === 'deliver' ? read.msg : null;
 
 }

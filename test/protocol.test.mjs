@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validate, parseMessage, cleanName, MAX_MESSAGE_CHARS } from '../js/net/Protocol.js';
+import { validate, parseMessage, readMessage, cleanName, MAX_MESSAGE_CHARS } from '../js/net/Protocol.js';
 
 const BOUNDS = { minX: - 50, maxX: 50, minZ: - 50, maxZ: 50 };
 
@@ -88,5 +88,16 @@ test( 'sources_nameCleaningFiles_containNoRawControlCharacters', () => {
 		assert.equal( /[\x00-\x08\x0b-\x1f\x7f]/.test( text ), false, file );
 
 	}
+
+} );
+
+test( 'readMessage_outOfBoundsStateVsMalformed_areToldApart', () => {
+
+	assert.deepEqual( readMessage( JSON.stringify( VALID.state ), BOUNDS ), { kind: 'deliver', msg: VALID.state } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, p: [ 999, 0.5, 0 ] } ), BOUNDS ), { kind: 'ignore' } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, p: [ 0, 99, 0 ] } ), BOUNDS ), { kind: 'ignore' } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, v: [ 500, 0, 0 ] } ), BOUNDS ), { kind: 'drop' } );
+	assert.deepEqual( readMessage( JSON.stringify( { type: 'hello', name: '' } ), BOUNDS ), { kind: 'drop' } );
+	assert.deepEqual( readMessage( '{not json', BOUNDS ), { kind: 'drop' } );
 
 } );
