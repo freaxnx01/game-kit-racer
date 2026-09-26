@@ -2,6 +2,7 @@
 // localStorage, sampled by lap time so the ghost runs in sync with the lap timer. Pure (no three.js).
 // A sample is [ t, px, py, pz, qx, qy, qz, qw ]: lap time in seconds, the truck's position and rotation.
 
+export const SAMPLE_INTERVAL = 0.05; // seconds between recorded samples (20 Hz)
 export const MAX_LAP_SECONDS = 300;  // longer laps are not kept as a ghost
 const STORAGE_PREFIX = 'racing.ghost.';
 const FORMAT = 1;
@@ -125,5 +126,79 @@ export function saveGhost( key, ghost, storage ) {
 		( storage || globalThis.localStorage ).setItem( key, encodeGhost( ghost ) );
 
 	} catch {}
+
+}
+
+// Records the lap being driven and keeps the fastest complete lap as `best`.
+// Feed it every frame while the lap timer runs; onNewBest( ghost ) fires when best changes.
+export class GhostRun {
+
+	constructor( best ) {
+
+		this.best = best;
+		this.onNewBest = null;
+		this.lap = null;
+		this.samples = null;
+
+	}
+
+	// lap, lapTime, lastLap: LapTimer's lap, currentLapTime and lastLap; p, q: the truck's pose.
+	update( lap, lapTime, lastLap, p, q ) {
+
+		if ( this.lap !== null && lap === this.lap + 1 ) this.finishLap( lastLap, p, q );
+		if ( lap !== this.lap ) this.startLap( lap );
+		this.record( lapTime, p, q );
+
+	}
+
+	// Forget the lap in progress (e.g. while a multiplayer race runs); the next update starts over.
+	discard() {
+
+		this.lap = null;
+		this.samples = null;
+
+	}
+
+	poseAt( lapTime ) {
+
+		return sampleGhost( this.best, lapTime );
+
+	}
+
+	startLap( lap ) {
+
+		this.lap = lap;
+		this.samples = [];
+
+	}
+
+	record( lapTime, p, q ) {
+
+		if ( ! this.samples ) return;
+
+		const partialLap = this.samples.length === 0 && lapTime > SAMPLE_INTERVAL;
+		if ( partialLap || lapTime > MAX_LAP_SECONDS ) {
+
+			this.samples = null;
+			return;
+
+		}
+
+		const last = this.samples[ this.samples.length - 1 ];
+		if ( last && lapTime - last[ 0 ] < SAMPLE_INTERVAL - 1e-6 ) return; // tolerance: frame times are floats
+		this.samples.push( [ lapTime, ...p, ...q ] );
+
+	}
+
+	finishLap( lapTime, p, q ) {
+
+		if ( ! this.samples || ! Number.isFinite( lapTime ) ) return;
+		if ( this.best && lapTime >= this.best.time ) return;
+
+		this.samples.push( [ lapTime, ...p, ...q ] );
+		this.best = { time: lapTime, samples: this.samples };
+		this.onNewBest?.( this.best );
+
+	}
 
 }
