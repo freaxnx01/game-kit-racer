@@ -21,6 +21,8 @@ import { Opponents } from './race/Opponents.js';
 import { MultiplayerRace } from './race/MultiplayerRace.js';
 import { Lobby } from './ui/Lobby.js';
 import { parseInviteHash } from './net/Signal.js';
+import { CpuRace } from './race/CpuRace.js';
+import { CpuPanel } from './ui/CpuPanel.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -317,8 +319,18 @@ async function init() {
 		},
 	};
 
+	// CPU opponents (#4): same adapter as multiplayer, its own set of opponent trucks.
+	const cpuPanel = new CpuPanel();
+	const cpuRace = new CpuRace( { ...game, opponents: new Opponents( scene, world, models ) }, { onChange: ( view ) => cpuPanel.render( view ) } );
+
 	const lobby = new Lobby( { canRace: !! finishCell } );
-	const multiplayer = new MultiplayerRace( game, { onChange: ( view ) => lobby.render( view ) } );
+	const multiplayer = new MultiplayerRace( game, { onChange: ( view ) => {
+
+		if ( view.role ) cpuRace.quit(); // creating or joining a multiplayer session ends a CPU race
+		lobby.render( view );
+
+	} } );
+	cpuPanel.bind( cpuRace, { isBusy: () => !! multiplayer.view().role } );
 	lobby.bind( multiplayer );
 	const invite = parseInviteHash( window.location.hash );
 	if ( invite ) lobby.openJoin( invite );
@@ -351,6 +363,7 @@ async function init() {
 		if ( holdInput ) Object.assign( input, { x: 0, z: 0, touchActive: false } );
 
 		multiplayer.update( dt );
+		cpuRace.update( dt );
 		updateWorld( world, contactListener, dt );
 
 		vehicle.update( dt, input );

@@ -17,6 +17,9 @@ All notable changes to this project are documented here, following
   paste back their answer code, and race a countdown start over 1–10 laps with
   trucks you can bump into. Works without any server; strict company networks
   may block it (a phone hotspot helps). Available in German and English.
+- Race against the computer: **vs CPU** puts up to three CPU trucks on the grid —
+  pick easy, medium or hard and 1–10 laps. Works on every track that is one
+  closed circuit. Available in German and English.
 
 ## [0.1.0] - 2026-09-24
 
