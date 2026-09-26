@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><body><pre id="log"></pre>
+<script type="module">
+// Headless check for Session.js: open as ?role=host or ?role=guest; the test driver copies codes between pages.
+import { Session } from '../../js/net/Session.js';
+
+const role = new URLSearchParams( location.search ).get( 'role' );
+const log = ( line ) => { document.getElementById( 'log' ).textContent += line + '\n'; window.events.push( line ); };
+window.events = [];
+window.session = new Session( {
+	bounds: { minX: - 100, maxX: 100, minZ: - 100, maxZ: 100 },
+	onMessage: ( id, msg ) => log( `message ${ id } ${ msg.type }` ),
+	onOpen: ( id ) => log( `open ${ id }` ),
+	onClose: ( id, reason ) => log( `close ${ id } ${ reason }` ),
+} );
+window.role = role;
+window.ready = true;
+</script></body></html>

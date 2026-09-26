@@ -1,0 +1,41 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+	body { margin: 0; height: 100vh; background: #3a7; }
+	.corner-link { position: absolute; background: #fff; padding: 9px 18px; border-radius: 999px; font: 13px sans-serif; }
+</style></head><body>
+<script type="module">
+// Headless end-to-end check of the multiplayer flow with a fake game (no three.js, no physics):
+// real Lobby UI, real MultiplayerRace, real WebRTC Session between two browser pages.
+import { Lobby } from '../../js/ui/Lobby.js';
+import { MultiplayerRace } from '../../js/race/MultiplayerRace.js';
+import { parseInviteHash } from '../../js/net/Signal.js';
+
+const ring = [];
+for ( let i = 0; i < 4; i ++ ) ring.push( [ i, 0 ], [ 4, i ], [ 4 - i, 4 ], [ 0, 4 - i ] );
+const trackCells = ring.map( ( [ gx, gz ], i ) => [ gx, gz, i === 0 ? 'track-finish' : 'track-straight', 16 ] );
+
+const lapTimer = {
+	onLap: null, running: false, progressValue: 0.25,
+	resetForRace() { this.running = false; }, startRace() { this.running = true; }, resetForSolo() { this.running = false; },
+	progress() { return this.progressValue; },
+};
+const opponents = {
+	trucks: new Map(),
+	add( id, name ) { this.trucks.set( id, { name, states: 0 } ); }, remove( id ) { this.trucks.delete( id ); }, clear() { this.trucks.clear(); },
+	push( id ) { const t = this.trucks.get( id ); if ( t ) t.states ++; }, update() {},
+};
+const game = {
+	trackCells, cellSize: 9.99 * 0.75, pageUrl: location.href, mapParam: 'fYYNfoYBf4YB', osmParam: null, lapTimer, opponents,
+	placeOnSlot( slot ) { window.slot = slot; }, setHold( hold ) { window.hold = hold; },
+	localState() { return { p: [ 10, 0.5, 5 ], q: [ 0, 0, 0, 1 ], v: [ 1, 0, 0 ] }; },
+};
+
+const lobby = new Lobby();
+const mp = new MultiplayerRace( game, { onChange: ( view ) => lobby.render( view ) } );
+lobby.bind( mp );
+const offer = parseInviteHash( location.hash );
+if ( offer ) lobby.openJoin( offer );
+setInterval( () => mp.update( 1 / 60 ), 16 );
+Object.assign( window, { mp, lobby, game } );
+window.ready = true;
+</script></body></html>

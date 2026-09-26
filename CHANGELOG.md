@@ -13,6 +13,10 @@ All notable changes to this project are documented here, following
   around the road, and the name of the street you are driving on.
 - New "Auto" option in the OpenStreetMap track builder: smoother corners without
   losing parts of the route. It is the new default.
+- Multiplayer: race up to three friends over the internet — send an invite link,
+  paste back their answer code, and race a countdown start over 1–10 laps with
+  trucks you can bump into. Works without any server; strict company networks
+  may block it (a phone hotspot helps). Available in German and English.
 
 ## [0.1.0] - 2026-09-24
 
