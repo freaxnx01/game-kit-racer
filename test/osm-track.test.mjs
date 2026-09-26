@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import {
 	overpassQuery, fetchOverpass, OVERPASS_MIRRORS, buildGraph, makeProjection,
 	perimeterLoop, simplifyPolyline, rasterizeLoop, loopToTrackCells, trackStats,
-	DEFAULT_HIGHWAYS,
+	DEFAULT_HIGHWAYS, bakeLoop,
 } from '../js/OsmTrack.js';
 
 const fixture = JSON.parse( fs.readFileSync( new URL( './fixtures/sisseln.json', import.meta.url ) ) );
@@ -208,5 +208,33 @@ test( 'buildGraph_unnamedBridge_usesBridgeName', () => {
 	] );
 	const graph = buildGraph( osm, makeProjection( MINI_BBOX ) );
 	assert.deepEqual( graph.ways.map( ( w ) => w.name ), [ 'Holzbrücke Bad Säckingen', 'Rheinbrückstrasse', '' ] );
+
+} );
+
+test( 'bakeLoop_fourCornersOfABlock_returnsClosedTrackAroundIt', () => {
+
+	const osm = miniOsm( [ [ 10, [ 1, 2, 3, 4, 1 ], { highway: 'residential', name: 'Ring' } ] ] );
+	const corners = [ [ 47.0, 8.0 ], [ 47.0, 8.001 ], [ 47.001, 8.001 ], [ 47.001, 8.0 ] ];
+	const r = bakeLoop( osm, { bbox: MINI_BBOX, waypoints: corners, mpc: 10, mode: 'L' } );
+	assert.deepEqual( r.ids, [ 1, 2, 3, 4 ] );
+	assert.equal( r.shortcuts, 0 );
+	assert.equal( r.duplicates.size, 0 );
+	assert.equal( r.cells[ 0 ][ 2 ], 'track-finish' );
+	assert.equal( r.cells.length, 2 * ( r.center.width + r.center.height ) - 4 ); // the block's outline, nothing else
+
+} );
+
+test( 'bakeLoop_waypointOnDisconnectedRoad_throws', () => {
+
+	const osm = miniOsm( [ [ 10, [ 1, 2 ], { highway: 'residential' } ], [ 11, [ 3, 4 ], { highway: 'residential' } ] ] );
+	const waypoints = [ [ 47.0, 8.0 ], [ 47.0, 8.001 ], [ 47.001, 8.001 ] ];
+	assert.throws( () => bakeLoop( osm, { bbox: MINI_BBOX, waypoints, mpc: 10 } ), /not connected by road/ );
+
+} );
+
+test( 'bakeLoop_fewerThanThreeWaypoints_throws', () => {
+
+	const osm = miniOsm( [ [ 10, [ 1, 2, 3, 4, 1 ], { highway: 'residential' } ] ] );
+	assert.throws( () => bakeLoop( osm, { bbox: MINI_BBOX, waypoints: [ [ 47.0, 8.0 ], [ 47.001, 8.001 ] ], mpc: 10 } ), /at least three/ );
 
 } );

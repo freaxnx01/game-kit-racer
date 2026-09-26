@@ -623,6 +623,36 @@ export function trackStats( cells, metersPerCell ) {
 
 }
 
+// Waypoint loop → track cells: osm-track.html's point mode without the page. waypoints = [[lat, lon], …]
+// in driving order; the lap starts at the first one. Returns { ids, cells, center, shortcuts, duplicates }
+// (ids = the routed OSM node loop, cells = Track.js cells, center = loopCenter of the raster).
+export function bakeLoop( osm, { bbox, waypoints, mpc, mode = 'auto', tol = mpc } ) {
+
+	if ( waypoints.length < 3 ) throw new Error( 'A loop needs at least three waypoints' );
+
+	const project = makeProjection( bbox );
+	const graph = buildGraph( osm, project );
+
+	const snapped = waypoints.map( ( [ lat, lon ] ) => {
+
+		const p = project( lat, lon );
+		const hit = nearestNode( graph, p.x, p.y );
+		if ( ! hit ) throw new Error( 'No roads in this area' );
+		return hit.node.id;
+
+	} );
+
+	const { ids, missing } = routeLoop( graph, snapped );
+	if ( missing.length ) throw new Error( `Waypoint ${ missing.map( ( i ) => i + 1 ).join( ', ' ) } is not connected by road to the next one` );
+
+	const pts = ids.map( ( id ) => graph.nodes.get( id ) );
+	const simplified = simplifyPolyline( [ ...pts, pts[ 0 ] ], tol ).slice( 0, - 1 );
+	const { cells: loop, duplicates, shortcuts } = rasterizeLoop( simplified, mpc, mode );
+
+	return { ids, cells: loopToTrackCells( loop ), center: loopCenter( loop ), shortcuts, duplicates };
+
+}
+
 // ── Codec (mirrors Track.js exactly, so this module has no three.js dependency) ──
 const TYPE_INDEX = { 'track-straight': 0, 'track-corner': 1, 'track-bump': 2, 'track-finish': 3 };
 const GODOT_TO_ORIENT = { 0: 0, 16: 1, 10: 2, 22: 3 };
