@@ -29,6 +29,9 @@ All notable changes to this project are documented here, following
   and street names around you.
 - The OpenStreetMap track builder now also uses pedestrian zones, so old-town
   lanes can be part of a track.
+- Racing against the CPU: the CPU trucks now show up as coloured dots (green,
+  purple, red) on the minimap, so you can always see who's on your tail — even
+  when they're off screen.
 
 ### Changed
 
