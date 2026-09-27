@@ -26,6 +26,7 @@ import { Lobby } from './ui/Lobby.js';
 import { parseInviteHash } from './net/Signal.js';
 import { CpuRace } from './race/CpuRace.js';
 import { CpuPanel } from './ui/CpuPanel.js';
+import { OpponentContacts } from './race/OpponentContacts.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -352,7 +353,8 @@ async function init() {
 
 	// CPU opponents (#4): same adapter as multiplayer, its own set of opponent trucks.
 	const cpuPanel = new CpuPanel();
-	const cpuRace = new CpuRace( { ...game, opponents: new Opponents( scene, world, models ) },
+	const cpuOpponents = new Opponents( scene, world, models );
+	const cpuRace = new CpuRace( { ...game, opponents: cpuOpponents },
 		{ onChange: ( view ) => cpuPanel.render( view ), isBusy: () => !! multiplayer.view().role } );
 
 	const lobby = new Lobby( { canRace: !! finishCell } );
@@ -374,10 +376,21 @@ async function init() {
 	const invite = parseInviteHash( window.location.hash );
 	if ( invite ) lobby.openJoin( invite );
 
+	// Bumps with opponent trucks (#13): no bounce, capped push, sound from the relative speed.
+	const opponentContacts = new OpponentContacts( world, sphereBody, [ game.opponents, cpuOpponents ],
+		{ onBump: ( speed ) => audio.playImpact( speed ) } );
+
 	const contactListener = {
-		onContactAdded( bodyA, bodyB ) {
+		onContactAdded( bodyA, bodyB, manifold, settings ) {
 
 			if ( bodyA !== sphereBody && bodyB !== sphereBody ) return;
+
+			if ( opponentContacts.involvesOpponent( bodyA, bodyB ) ) {
+
+				opponentContacts.contactAdded( bodyA, bodyB, settings );
+				return;
+
+			}
 
 			_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
 			_forward.y = 0;
@@ -386,7 +399,12 @@ async function init() {
 			const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
 			audio.playImpact( impactVelocity );
 
-		}
+		},
+		onContactPersisted( bodyA, bodyB, manifold, settings ) {
+
+			if ( opponentContacts.involvesOpponent( bodyA, bodyB ) ) opponentContacts.contactPersisted( settings );
+
+		},
 	};
 
 	const timer = new THREE.Timer();
@@ -403,7 +421,9 @@ async function init() {
 
 		multiplayer.update( dt );
 		cpuRace.update( dt );
+		opponentContacts.beginStep();
 		updateWorld( world, contactListener, dt );
+		opponentContacts.endStep();
 
 		vehicle.update( dt, input );
 
