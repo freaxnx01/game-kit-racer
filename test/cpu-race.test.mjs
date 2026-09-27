@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CpuRace, YOU, cleanSettings, laneOf } from '../js/race/CpuRace.js';
-import { COUNTDOWN_MS, RESULTS_GRACE_MS, gridSlots } from '../js/race/RaceState.js';
+import { COUNTDOWN_MS, RESULTS_GRACE_MS, PHASE, gridSlots } from '../js/race/RaceState.js';
 import { RENDER_DELAY_MS } from '../js/race/Interpolate.js';
 
 const CELL = 9.99 * 0.75;
@@ -243,5 +243,68 @@ test( 'start_whileBusyWithAMultiplayerSession_refuses', () => {
 	assert.equal( race.start( {} ), false );
 	assert.equal( game.hold, false );
 	assert.equal( game.lapTimer.raceResets, 0 );
+
+} );
+
+test( 'markers_noRace_isEmpty', () => {
+
+	const race = new CpuRace( fakeGame(), { now: () => 0 } );
+	assert.deepEqual( race.markers(), [] );
+
+} );
+
+test( 'markers_duringCountdown_oneDotPerCpuOnItsGridPose', () => {
+
+	const { race } = setup();
+	assert.equal( race.view().phase, PHASE.COUNTDOWN );
+	const markers = race.markers();
+	assert.equal( markers.length, 3 );
+	[ ...race.drivers.values() ].forEach( ( driver, i ) => {
+
+		const { p } = driver.state();
+		assert.deepEqual( markers[ i ], { x: p[ 0 ], z: p[ 2 ], colour: i } );
+
+	} );
+
+} );
+
+test( 'markers_whileRacing_followTheDrivers', () => {
+
+	const { race, step, runUntil } = setup();
+	const grid = race.markers();
+	runUntil( () => race.view().phase === PHASE.RACING );
+	for ( let n = 0; n < 150; n ++ ) step( 20 );
+	const markers = race.markers();
+	[ ...race.drivers.values() ].forEach( ( driver, i ) => {
+
+		const { p } = driver.state();
+		assert.deepEqual( markers[ i ], { x: p[ 0 ], z: p[ 2 ], colour: i } );
+		assert.ok( Math.hypot( markers[ i ].x - grid[ i ].x, markers[ i ].z - grid[ i ].z ) > 1, `cpu ${ i } moved away from the grid` );
+
+	} );
+
+} );
+
+test( 'markers_afterQuit_isEmpty', () => {
+
+	const { race, step } = setup();
+	step( COUNTDOWN_MS + 500 );
+	race.quit();
+	assert.deepEqual( race.markers(), [] );
+
+} );
+
+test( 'markers_afterRematch_oneDotPerCpu', () => {
+
+	const { race } = setup( { cpus: 2, difficulty: 'easy', laps: 1 } );
+	race.rematch();
+	assert.deepEqual( race.markers().map( ( m ) => m.colour ), [ 0, 1 ] );
+
+} );
+
+test( 'markers_oneCpu_singleGreenDot', () => {
+
+	const { race } = setup( { cpus: 1, difficulty: 'easy', laps: 1 } );
+	assert.deepEqual( race.markers().map( ( m ) => m.colour ), [ 0 ] );
 
 } );

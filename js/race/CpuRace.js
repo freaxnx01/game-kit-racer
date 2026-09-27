@@ -144,6 +144,18 @@ export class CpuRace {
 
 	}
 
+	// Minimap dots: where each CPU truck is drawn, and its truck colour index (0–2, as given to opponents.add).
+	markers() {
+
+		return [ ...this.drivers.values() ].map( ( driver, colour ) => {
+
+			const { p } = driver.state();
+			return { x: p[ 0 ], z: p[ 2 ], colour };
+
+		} );
+
+	}
+
 	// ── Internals ───────────────────────────────────────────
 
 	gridSlots() {
