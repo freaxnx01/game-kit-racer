@@ -29,6 +29,7 @@ import { CpuPanel } from './ui/CpuPanel.js';
 import { OpponentContacts } from './race/OpponentContacts.js';
 import { loadOverlay } from './ui/LoadOverlay.js';
 import { t } from './ui/strings.js';
+import { probeGridSize } from './ProbeGrid.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -241,14 +242,14 @@ async function init() {
 	// Probes
 
 	const probeHeight = 6;
-	const probes = new LightProbeGrid(
-		hw * 2, probeHeight, hd * 2,
-		Math.max( 4, Math.round( hw / 4 ) ),
-		2,
-		Math.max( 4, Math.round( hd / 4 ) ),
-	);
+	const grid = probeGridSize( hw, hd );
+	const probeCount = grid.x * grid.y * grid.z;
+	const probes = new LightProbeGrid( hw * 2, probeHeight, hd * 2, grid.x, grid.y, grid.z );
 	probes.position.set( bounds.centerX, probeHeight / 2, bounds.centerZ );
+	console.info( `Baking lighting: ${ probeCount } probes (${ grid.x }x${ grid.y }x${ grid.z })…` );
+	const bakeStart = performance.now();
 	probes.bake( renderer, scene, { cubemapSize: 32, near: 0.1, far: groundSize } );
+	console.info( `Lighting baked: ${ probeCount } probes in ${ Math.round( performance.now() - bakeStart ) } ms` );
 	scene.add( probes );
 
 	// scene.add( new LightProbeGridHelper( probes, 0.5 ) );

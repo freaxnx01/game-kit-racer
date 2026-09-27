@@ -55,6 +55,12 @@ All notable changes to this project are documented here, following
 - vs CPU: restart or quit a running race at any time — with the buttons under the
   positions, from the **vs CPU** button, or with `Esc`.
 
+### Changed
+
+- Tracks load much faster, most of all the big ones: "Bad Säckingen Altstadt"
+  used to keep you waiting for a long time, the Aerodrome circuits several times
+  longer than the starter circuit. The starter circuit loads as before.
+
 ## [0.1.0] - 2026-09-24
 
 ### Added
