@@ -1,0 +1,107 @@
+<!DOCTYPE html><html><head>
+<script type="importmap">{ "imports": {
+	"three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+	"crashcat": "https://esm.sh/crashcat@0.0.3"
+} }</script></head><body>
+<script type="module">
+// Headless physics check for OpponentContacts + Opponents: an opponent truck driving into a resting player
+// truck nudges it (capped, no lift), is reported once as a bump with its relative speed, and a pose jump
+// teleports the truck without flinging anything. Wired exactly like main.js.
+import * as THREE from 'three';
+import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, enableCollision, registerAll, updateWorld, rigidBody, box, MotionType } from 'crashcat';
+import { createSphereBody } from '../../js/Physics.js';
+import { Opponents } from '../../js/race/Opponents.js';
+import { OpponentContacts } from '../../js/race/OpponentContacts.js';
+
+registerAll();
+const DT = 1 / 60;
+
+function setup() {
+
+	const settings = createWorldSettings();
+	settings.gravity = [ 0, - 9.81, 0 ];
+	const bplMoving = addBroadphaseLayer( settings ), bplStatic = addBroadphaseLayer( settings );
+	const olMoving = addObjectLayer( settings, bplMoving ), olStatic = addObjectLayer( settings, bplStatic );
+	enableCollision( settings, olMoving, olStatic );
+	enableCollision( settings, olMoving, olMoving );
+	const world = createWorld( settings );
+	world._OL_MOVING = olMoving;
+	world._OL_STATIC = olStatic;
+	rigidBody.create( world, { shape: box.create( { halfExtents: [ 50, 0.01, 50 ] } ), motionType: MotionType.STATIC, objectLayer: olStatic, position: [ 0, - 0.125, 0 ], friction: 5, restitution: 0 } );
+	const player = createSphereBody( world, [ 0, 0.5, 0 ] );
+	const opponents = new Opponents( new THREE.Scene(), world, {} );
+	opponents.add( 'c', 'C', 0 );
+	const bumps = [];
+	let clock = 0;
+	const contacts = new OpponentContacts( world, player, [ opponents ], { onBump: ( speed ) => bumps.push( + speed.toFixed( 2 ) ), now: () => clock } );
+	const listener = {
+		onContactAdded( a, b, manifold, s ) {
+
+			if ( contacts.involvesOpponent( a, b ) ) contacts.contactAdded( a, b, s );
+
+		},
+		onContactPersisted( a, b, manifold, s ) {
+
+			if ( contacts.involvesOpponent( a, b ) ) contacts.contactPersisted( s );
+
+		},
+	};
+	const step = ( pose ) => {
+
+		clock += DT * 1000;
+		opponents.push( 'c', pose, clock );
+		opponents.update( DT, clock + 100 );
+		contacts.beginStep();
+		updateWorld( world, listener, DT );
+		contacts.endStep();
+
+	};
+	return { player, body: opponents.trucks.get( 'c' ).body, bumps, step };
+
+}
+
+// Opponent drives along +x from x = -3 at `speed`, `offset` off the player's centre line.
+function drive( offset, speed = 10 ) {
+
+	const { player, bumps, step } = setup();
+	let peakV = 0, peakY = 0;
+	for ( let i = 0; i < 120; i ++ ) {
+
+		step( { p: [ - 3 + speed * ( i + 1 ) * DT, 0.5, offset ], q: [ 0, 0, 0, 1 ], v: [ speed, 0, 0 ] } );
+		const v = player.motionProperties.linearVelocity;
+		peakV = Math.max( peakV, Math.hypot( v[ 0 ], v[ 2 ] ) );
+		peakY = Math.max( peakY, player.position[ 1 ] );
+
+	}
+
+	return { peakV: + peakV.toFixed( 2 ), peakY: + peakY.toFixed( 2 ), bumps };
+
+}
+
+function teleport() {
+
+	const { player, body, step } = setup();
+	const pose = ( x ) => ( { p: [ x, 0.5, 5 ], q: [ 0, 0, 0, 1 ], v: [ 0, 0, 0 ] } );
+	step( pose( - 3 ) );
+	const firstVy = body.motionProperties.linearVelocity[ 1 ];
+	for ( let i = 0; i < 5; i ++ ) step( pose( - 3 ) );
+	step( pose( 20 ) );
+	return {
+		firstVy: + firstVy.toFixed( 2 ),
+		bodyX: + body.position[ 0 ].toFixed( 2 ),
+		bodyV: + Math.hypot( ...body.motionProperties.linearVelocity ).toFixed( 2 ),
+		playerMoved: + Math.hypot( player.position[ 0 ], player.position[ 2 ] ).toFixed( 3 ),
+	};
+
+}
+
+function noContact() {
+
+	const { player, step } = setup();
+	for ( let i = 0; i < 30; i ++ ) step( { p: [ - 20, 0.5, 20 ], q: [ 0, 0, 0, 1 ], v: [ 0, 0, 0 ] } );
+	return { playerY: + player.position[ 1 ].toFixed( 2 ) };
+
+}
+
+window.result = { headOn: drive( 0 ), glancing: drive( 0.6 ), teleport: teleport(), noContact: noContact() };
+</script></body></html>

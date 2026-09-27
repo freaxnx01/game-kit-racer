@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { rigidBody, sphere, MotionType } from 'crashcat';
 import { pushState, sampleBuffer, RENDER_DELAY_MS } from './Interpolate.js';
+import { isTeleport } from './Bump.js';
 
 const TRUCKS = [ 'vehicle-truck-green', 'vehicle-truck-purple', 'vehicle-truck-red' ];
 const SPHERE_RADIUS = 0.5;  // same as the player's body (Physics.js createSphereBody)
@@ -84,6 +85,14 @@ export class Opponents {
 
 	}
 
+	// True when body is one of these trucks' physics bodies (for the contact listener).
+	owns( body ) {
+
+		for ( const truck of this.trucks.values() ) if ( truck.body === body ) return true;
+		return false;
+
+	}
+
 	// A validated `state` message received at local time now (ms).
 	push( id, state, now ) {
 
@@ -100,12 +109,28 @@ export class Opponents {
 			const pose = sampleBuffer( truck.buffer, now - RENDER_DELAY_MS );
 			if ( ! pose ) continue;
 
-			if ( dt > 0 ) rigidBody.moveKinematic( truck.body, pose.p, pose.q, dt );
+			if ( dt > 0 ) this.moveBody( truck.body, pose, dt );
 			truck.group.visible = true;
 			truck.group.position.set( pose.p[ 0 ], pose.p[ 1 ] - MODEL_OFFSET_Y, pose.p[ 2 ] );
 			truck.group.quaternion.set( pose.q[ 0 ], pose.q[ 1 ], pose.q[ 2 ], pose.q[ 3 ] );
 
 		}
+
+	}
+
+	// Follows the pose, or jumps straight there with no velocity when following would take a teleport's speed
+	// (first placement from HIDDEN, a rematch, a network hiccup) — so nothing touching it gets flung.
+	moveBody( body, pose, dt ) {
+
+		if ( isTeleport( body.position, pose.p, dt ) ) {
+
+			rigidBody.setPosition( this.world, body, pose.p, false );
+			rigidBody.setLinearVelocity( this.world, body, [ 0, 0, 0 ] );
+			return;
+
+		}
+
+		rigidBody.moveKinematic( body, pose.p, pose.q, dt );
 
 	}
 
