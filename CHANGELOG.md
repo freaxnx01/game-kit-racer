@@ -8,6 +8,9 @@ All notable changes to this project are documented here, following
 
 ### Added
 
+- Ghost: after your first full lap, a see-through truck replays your fastest
+  lap on that track, in step with the lap timer — race it to beat your best.
+  It is saved per track, so it is waiting for you next time.
 - Mini map in the top-right corner on every track, showing where you are.
 - Tracks built from OpenStreetMap now show the real buildings and side streets
   around the road, and the name of the street you are driving on.
@@ -20,6 +23,12 @@ All notable changes to this project are documented here, following
 - Race against the computer: **vs CPU** puts up to three CPU trucks on the grid —
   pick easy, medium or hard and 1–10 laps. Works on every track that is one
   closed circuit. Available in German and English.
+- New track "Bad Säckingen Altstadt" in the Tracks menu: start on the covered
+  wooden bridge over the Rhine, cross to Stein AG, come back over the
+  Fridolinsbrücke and race through the old-town lanes — with the real houses
+  and street names around you.
+- The OpenStreetMap track builder now also uses pedestrian zones, so old-town
+  lanes can be part of a track.
 
 ## [0.1.0] - 2026-09-24
 

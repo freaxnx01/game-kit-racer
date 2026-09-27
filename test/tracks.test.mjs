@@ -1,7 +1,7 @@
 // Run: node --test test/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESET_TRACKS } from '../js/Tracks.js';
+import { PRESET_TRACKS, trackHref } from '../js/Tracks.js';
 
 const TYPE_NAMES = [ 'track-straight', 'track-corner', 'track-bump', 'track-finish' ];
 const ORIENT_TO_GODOT = [ 0, 16, 10, 22 ];
@@ -21,10 +21,20 @@ function decode( str ) {
 
 }
 
-test( 'presets list the default track plus the four Aerodrome Apex tracks', () => {
+test( 'presets list the default track, the four Aerodrome Apex tracks and Bad Säckingen', () => {
 
-	assert.deepEqual( PRESET_TRACKS.map( ( t ) => t.id ), [ 'default', 'aero', 'northants', 'styria', 'claypit' ] );
+	assert.deepEqual( PRESET_TRACKS.map( ( t ) => t.id ), [ 'default', 'aero', 'northants', 'styria', 'claypit', 'bad-saeckingen' ] );
 	assert.equal( PRESET_TRACKS[ 0 ].map, null );
+
+} );
+
+test( 'trackHref_presets_addOsmOnlyWhenPresent', () => {
+
+	assert.equal( trackHref( { map: null } ), 'index.html' );
+	assert.equal( trackHref( { map: 'abc' } ), 'index.html?map=abc' );
+	assert.equal( trackHref( { map: 'abc', osm: '1,2,3,4,10,0,0' } ), 'index.html?map=abc&osm=1,2,3,4,10,0,0' );
+	const bs = PRESET_TRACKS.find( ( t ) => t.id === 'bad-saeckingen' );
+	assert.match( trackHref( bs ), /^index\.html\?map=[\w-]+&osm=47\.5435,7\.94,47\.5565,7\.956,10,-?\d+,-?\d+$/ );
 
 } );
 

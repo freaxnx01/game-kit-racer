@@ -16,6 +16,8 @@ import { ColorMapGLTFLoader } from './Loader.js';
 import { Hud } from './OsmHud.js';
 import { parseOsmParam, viewArea } from './OsmData.js';
 import { loadSurroundings, VIEW_MARGIN_CELLS } from './OsmScene.js';
+import { GhostRun, ghostStorageKey, loadGhost, saveGhost } from './race/Ghost.js';
+import { GhostCar } from './race/GhostCar.js';
 import { gridSlots } from './race/RaceState.js';
 import { Opponents } from './race/Opponents.js';
 import { MultiplayerRace } from './race/MultiplayerRace.js';
@@ -248,6 +250,30 @@ async function init() {
 
 	const lapTimer = new LapTimer( customCells, mapParam );
 
+	// Ghost (#3): replays the fastest lap on this track — same track key as the best lap time.
+	const ghostKey = ghostStorageKey( mapParam );
+	const ghostRun = new GhostRun( loadGhost( ghostKey ) );
+	ghostRun.onNewBest = ( ghost ) => saveGhost( ghostKey, ghost );
+	const ghostCar = new GhostCar( scene, models[ 'vehicle-truck-yellow' ] );
+
+	function updateGhost() {
+
+		// persist === false only while a multiplayer race (#1) runs: no ghost there, and race laps are not recorded.
+		const soloLap = lapTimer.enabled && lapTimer.running && lapTimer.persist !== false;
+		if ( ! soloLap ) {
+
+			ghostRun.discard();
+			ghostCar.setPose( null );
+			return;
+
+		}
+
+		const c = vehicle.container;
+		ghostRun.update( lapTimer.lap, lapTimer.currentLapTime, lapTimer.lastLap, c.position.toArray(), c.quaternion.toArray() );
+		ghostCar.setPose( ghostRun.poseAt( lapTimer.currentLapTime ) );
+
+	}
+
 	const cellSize = CELL_RAW * GRID_SCALE;
 	const hud = new Hud( customCells || TRACK_CELLS, cellSize );
 
@@ -303,6 +329,9 @@ async function init() {
 			vehicle.spherePos.set( position[ 0 ], position[ 1 ], position[ 2 ] );
 			vehicle.prevModelPos.set( position[ 0 ], 0, position[ 2 ] );
 			vehicle.linearSpeed = 0;
+			vehicle.angularSpeed = 0;
+			vehicle.acceleration = 0;
+			vehicle.sphereVel.set( 0, 0, 0 );
 			vehicle.container.quaternion.setFromAxisAngle( _up, angle );
 
 		},
@@ -391,6 +420,7 @@ async function init() {
 
 		const hasInput = input.touchActive || Math.abs( input.x ) > 0.05 || Math.abs( input.z ) > 0.05;
 		lapTimer.update( dt, vehicle.spherePos, hasInput );
+		updateGhost();
 
 		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
 		hud.update( vehicle.spherePos.x, vehicle.spherePos.z, _forward.x, _forward.z );

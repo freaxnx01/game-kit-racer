@@ -1,0 +1,201 @@
+<!DOCTYPE html><html><head>
+<script type="importmap">{ "imports": {
+	"three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+	"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+} }</script></head><body>
+<script type="module">
+// Headless check for the ghost (#3) against the real LapTimer: a lap driven over every track cell and
+// across the line is stored as the ghost, replays the path that was driven, is replaced only by a
+// faster lap, and stays hidden (and unrecorded) during a multiplayer race.
+import * as THREE from 'three';
+import { LapTimer } from '../../js/LapTimer.js';
+import { TRACK_CELLS, CELL_RAW, GRID_SCALE, computeSpawnPosition } from '../../js/Track.js';
+import { GhostRun, ghostStorageKey, loadGhost, decodeGhost, saveGhost, sampleGhost, SAMPLE_INTERVAL } from '../../js/race/Ghost.js';
+import { GhostCar } from '../../js/race/GhostCar.js';
+
+const TRACK_ID = 'harness';
+const KEY = ghostStorageKey( TRACK_ID );
+const BEST_KEY = 'racing.bestLap.' + TRACK_ID;
+const CELL = CELL_RAW * GRID_SCALE;
+const DT = 1 / 60;
+
+localStorage.removeItem( KEY );
+localStorage.removeItem( BEST_KEY );
+
+// Stand-in for the loaded truck GLB: one mesh with one material, so cloning can be checked.
+const source = new THREE.Group();
+const sourceMaterial = new THREE.MeshStandardMaterial( { color: 0xffcc00 } );
+source.add( new THREE.Mesh( new THREE.BoxGeometry( 1, 1, 2 ), sourceMaterial ) );
+
+const scene = new THREE.Scene();
+const lapTimer = new LapTimer( null, TRACK_ID );
+const ghostRun = new GhostRun( loadGhost( KEY ) );
+ghostRun.onNewBest = ( ghost ) => saveGhost( KEY, ghost );
+const ghostCar = new GhostCar( scene, source );
+
+// The player's truck transform, as main.js reads it from vehicle.container.
+const container = new THREE.Object3D();
+
+// Mirrors updateGhost() in js/main.js — the glue under test.
+function updateGhost() {
+
+	const soloLap = lapTimer.enabled && lapTimer.running && lapTimer.persist !== false;
+	if ( ! soloLap ) {
+
+		ghostRun.discard();
+		ghostCar.setPose( null );
+		return;
+
+	}
+
+	ghostRun.update( lapTimer.lap, lapTimer.currentLapTime, lapTimer.lastLap, container.position.toArray(), container.quaternion.toArray() );
+	ghostCar.setPose( ghostRun.poseAt( lapTimer.currentLapTime ) );
+
+}
+
+const spawn = computeSpawnPosition( TRACK_CELLS );
+const lineCenter = new THREE.Vector3( spawn.position[ 0 ], 0.5, spawn.position[ 2 ] );
+const forward = new THREE.Vector3( Math.sin( spawn.angle ), 0, Math.cos( spawn.angle ) );
+
+// Waypoints in order of decreasing distance in front of the line, so a run only ever crosses the line
+// backwards → forwards at the very end, the way a real lap does.
+const alongLine = ( p ) => p.clone().sub( lineCenter ).dot( forward );
+const waypoints = TRACK_CELLS
+	.filter( ( c ) => c[ 2 ] !== 'track-finish' )
+	.map( ( c ) => new THREE.Vector3( ( c[ 0 ] + 0.5 ) * CELL, 0.5, ( c[ 1 ] + 0.5 ) * CELL ) )
+	.sort( ( a, b ) => alongLine( b ) - alongLine( a ) );
+
+// One frame: the truck is at `spherePos`, its model half a unit lower (as in Vehicle.js).
+let trace = [];
+const _pos = new THREE.Vector3();
+function frame( spherePos ) {
+
+	container.position.set( spherePos.x, spherePos.y - 0.5, spherePos.z );
+	lapTimer.update( DT, spherePos, true );
+	updateGhost();
+	trace.push( {
+		lap: lapTimer.lap,
+		t: lapTimer.currentLapTime,
+		x: container.position.x,
+		z: container.position.z,
+		visible: ghostCar.group.visible,
+		ghostX: ghostCar.group.position.x,
+		ghostZ: ghostCar.group.position.z,
+	} );
+
+}
+
+// Drives the waypoint path in steps of `stepUnits` per frame (a bigger step = a faster lap; the
+// truck's top speed is MAX_SPEED * 12.5 ≈ 18 units/s, so ~0.3 units per 1/60 s frame), then crosses
+// the line.
+function driveLap( stepUnits ) {
+
+	// The run ends just short of the line, then steps over it: one continuous path, no teleports, so the
+	// 20 Hz recording is a faithful sample of it.
+	const path = [ ...waypoints, new THREE.Vector3().copy( lineCenter ).addScaledVector( forward, - stepUnits / 2 ) ];
+
+	for ( let i = 1; i < path.length; i ++ ) {
+
+		const frames = Math.max( 1, Math.ceil( path[ i - 1 ].distanceTo( path[ i ] ) / stepUnits ) );
+		for ( let f = 1; f <= frames; f ++ ) frame( _pos.lerpVectors( path[ i - 1 ], path[ i ], f / frames ) );
+
+	}
+
+	frame( _pos.copy( lineCenter ).addScaledVector( forward, stepUnits / 2 ) );
+
+}
+
+const result = {};
+window.result = result; // published as it fills up, so a failure still shows how far the run got
+
+// --- The ghost car itself -------------------------------------------------------------------------
+const ghostMesh = ghostCar.group.children[ 0 ].children[ 0 ];
+result.ghostCar = {
+	opacity: ghostMesh.material.opacity,
+	transparent: ghostMesh.material.transparent,
+	depthWrite: ghostMesh.material.depthWrite,
+	castShadow: ghostMesh.castShadow,
+	receiveShadow: ghostMesh.receiveShadow,
+	materialCloned: ghostMesh.material !== sourceMaterial,
+	sourceStillOpaque: sourceMaterial.opacity === 1 && sourceMaterial.transparent === false,
+	hiddenAtStart: ghostCar.group.visible === false,
+	sceneChildren: scene.children.length,
+	noBody: ! ( 'body' in ghostCar.group ) && ! ( 'rigidBody' in ghostCar.group ),
+};
+
+// --- Lap 1: nothing to replay, the lap is recorded and stored --------------------------------------
+result.timerEnabled = lapTimer.enabled;
+driveLap( 0.3 );
+const lap1Time = lapTimer.lastLap;
+const lap1Trace = trace.filter( ( f ) => f.lap === 1 );
+const stored = decodeGhost( localStorage.getItem( KEY ) );
+result.afterLap1 = {
+	lap: lapTimer.lap,
+	lapTime: + lap1Time.toFixed( 3 ),
+	storedTime: stored ? stored.time : null,
+	storedSamples: stored ? stored.samples.length : 0,
+	expectedSamples: Math.round( lap1Time / SAMPLE_INTERVAL ) + 1,
+	shownDuringLap1: lap1Trace.some( ( f ) => f.visible ),
+};
+
+// The stored ghost must retrace where the player was at the same lap time.
+let maxError = 0;
+for ( const f of lap1Trace ) {
+
+	const pose = sampleGhost( stored, f.t );
+	maxError = Math.max( maxError, Math.hypot( pose.p[ 0 ] - f.x, pose.p[ 2 ] - f.z ) );
+
+}
+result.replay = { maxErrorVsPlayerPath: + maxError.toFixed( 3 ), legLength: + CELL.toFixed( 2 ) };
+
+// --- Lap 2: the ghost car follows the recorded path, then vanishes when its lap time has passed ------
+trace = [];
+for ( let f = 1; f <= 30; f ++ ) frame( _pos.lerpVectors( waypoints[ 0 ], waypoints[ 1 ], f / 300 ) );
+let carError = 0;
+for ( const f of trace ) {
+
+	const pose = ghostRun.poseAt( f.t );
+	carError = Math.max( carError, Math.hypot( pose.p[ 0 ] - f.ghostX, pose.p[ 2 ] - f.ghostZ ) );
+
+}
+result.lap2 = { ghostVisible: trace.every( ( f ) => f.visible ), carMatchesSampleMaxError: carError };
+
+while ( lapTimer.currentLapTime <= stored.time + 0.1 ) frame( waypoints[ 0 ] );
+result.lap2.hiddenAfterItsLapTime = ghostCar.group.visible === false;
+
+// --- A slower lap keeps the ghost, a faster one replaces it ----------------------------------------
+lapTimer.reset( null );
+ghostRun.discard();
+trace = [];
+driveLap( 0.2 ); // slower: smaller steps
+result.slowerLap = { lapTime: + lapTimer.lastLap.toFixed( 3 ), storedTime: decodeGhost( localStorage.getItem( KEY ) ).time };
+
+lapTimer.reset( null );
+ghostRun.discard();
+trace = [];
+driveLap( 0.45 ); // faster: bigger steps
+result.fasterLap = { lapTime: + lapTimer.lastLap.toFixed( 3 ), storedTime: decodeGhost( localStorage.getItem( KEY ) ).time };
+
+// --- Multiplayer race: no ghost, and race laps are never stored -------------------------------------
+const beforeRace = localStorage.getItem( KEY );
+lapTimer.resetForRace();
+lapTimer.startRace();
+trace = [];
+driveLap( 0.9 ); // fast enough to beat the stored ghost, if it were recorded
+result.duringRace = {
+	lapCompleted: lapTimer.lap > 1,
+	lapTime: + lapTimer.lastLap.toFixed( 3 ),
+	ghostShown: trace.some( ( f ) => f.visible ),
+	storageUnchanged: localStorage.getItem( KEY ) === beforeRace,
+};
+
+// --- Back to solo: the ghost is available again ------------------------------------------------------
+lapTimer.resetForSolo();
+trace = [];
+for ( let f = 1; f <= 10; f ++ ) frame( _pos.lerpVectors( waypoints[ 0 ], waypoints[ 1 ], f / 300 ) );
+result.backToSolo = { ghostVisible: trace.every( ( f ) => f.visible ) };
+
+localStorage.removeItem( KEY );
+localStorage.removeItem( BEST_KEY );
+result.done = true;
+</script></body></html>

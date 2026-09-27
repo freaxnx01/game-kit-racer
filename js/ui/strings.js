@@ -55,6 +55,8 @@ export const STRINGS = {
 		'cpu.quit': 'Quit race',
 		'cpu.freeDrive': 'Free driving',
 		'cpu.noLoop': 'CPU trucks need one closed circuit with a finish line — pick another track.',
+		'mp.otherTrack': 'The host is racing on another track. Open it, then ask the host for a new invite.',
+		'mp.openHostTrack': 'Open the host’s track',
 	},
 
 	de: {
@@ -109,6 +111,8 @@ export const STRINGS = {
 		'cpu.quit': 'Rennen beenden',
 		'cpu.freeDrive': 'Freies Fahren',
 		'cpu.noLoop': 'CPU-Trucks brauchen einen geschlossenen Rundkurs mit Ziellinie — wähl eine andere Strecke.',
+		'mp.otherTrack': 'Der Gastgeber fährt auf einer anderen Strecke. Öffne sie und bitte ihn dann um eine neue Einladung.',
+		'mp.openHostTrack': 'Strecke des Gastgebers öffnen',
 	},
 
 };
