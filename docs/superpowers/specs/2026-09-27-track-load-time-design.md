@@ -62,7 +62,7 @@ Loading a large track takes a fraction of today's time, without the lighting loo
 noticeably different. **Success:** the light-probe grid never exceeds the default track's
 128 probes; the default track is byte-for-byte unchanged (still 8×2×8); every preset track
 bakes ≤ 128 probes (Bad Säckingen: 11 786 → 112, ~105× fewer; the Aerodrome circuits
-~5–7× fewer); a console line reports the probe count and bake time; the in-browser
+~5–7× fewer); console lines report the probe count and bake time; the in-browser
 playtest shows the same look.
 
 ## Scope
@@ -76,8 +76,9 @@ In scope:
    same factor so the grid keeps its aspect ratio and stays ≤ 64, never below 4 per axis.
 2. `js/main.js` uses it for the `LightProbeGrid` constructor instead of the inline
    `Math.max( 4, Math.round( … / 4 ) )` arithmetic.
-3. `js/main.js` logs the bake per the repo's logging rule: one `console.info` with the
-   probe count and the measured bake time in ms after `probes.bake` returns.
+3. `js/main.js` logs the bake per the repo's logging rule (before + after): a
+   `console.info` with the probe count and grid before `probes.bake`, and one with the
+   probe count and the measured bake time in ms after it returns.
 4. Unit tests `test/probe-grid.test.mjs` (`node --test`), and a Playwright before/after
    measurement.
 5. A player-facing entry in `CHANGELOG.md` `[Unreleased]`.
@@ -128,6 +129,7 @@ Styria 10×2×6, Claypit 10×2×5, Bad Säckingen 7×2×8.
 const grid = probeGridSize( hw, hd );
 const probes = new LightProbeGrid( hw * 2, probeHeight, hd * 2, grid.x, grid.y, grid.z );
 probes.position.set( … );
+console.info( `Baking lighting: ${ grid.x * grid.y * grid.z } probes (${ grid.x }x${ grid.y }x${ grid.z })…` );
 const bakeStart = performance.now();
 probes.bake( renderer, scene, { cubemapSize: 32, near: 0.1, far: groundSize } );
 console.info( `Lighting baked: ${ grid.x * grid.y * grid.z } probes in ${ Math.round( performance.now() - bakeStart ) } ms` );
@@ -151,7 +153,7 @@ Probe spacing (grid width / (probes − 1)), today → capped:
 Bad Säckingen's grid becomes coarse. Its surroundings are mostly the flat grass area that
 `buildTrack` lays out for OSM tracks (`js/Track.js:182-208`), so there is little indirect
 variation for a finer grid to capture. If the playtest shows a visible difference,
-`MAX_GROUND_PROBES` is the one knob: 256 gives Bad Säckingen 14×2×16 (26× fewer probes than
+`MAX_GROUND_PROBES` is the one knob: 256 gives Bad Säckingen 14×2×17 (~25× fewer probes than
 today instead of 105×) and leaves the default track unchanged.
 
 ## Testing
@@ -161,6 +163,6 @@ today instead of 105×) and leaves the default track unchanged.
   probes; a very elongated track stays ≥ 4 on its short axis and ≤ 64; Bad Säckingen's
   size → 7×2×8.
 - Playwright (manual gate for this buildless stack): per preset, the page logs
-  `Lighting baked: N probes` with N ≤ 128, reaches its first frame, console has no errors;
+  `Baking lighting: N probes` with N ≤ 128, reaches its first frame, console has no errors;
   before/after bake time recorded for the default track and The Aerodrome.
 - Visual playtest: default track and one Aerodrome circuit look the same as before.
