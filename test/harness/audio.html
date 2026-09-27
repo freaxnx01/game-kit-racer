@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- GameAudio loads 'audio/skid.ogg' relative to the page, so resolve everything from the repo root. -->
+<base href="../../">
+<script type="importmap">{ "imports": {
+	"three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
+} }</script>
+<style>
+	body { margin: 0; height: 100vh; background: #3a7; }
+	#stopper { position: absolute; left: 12px; bottom: 12px; padding: 9px 18px; background: #fff; border-radius: 999px; font: 13px sans-serif; }
+</style></head><body>
+<!-- Headless check for #12: the real GameAudio on a stub camera and target (no WebGL scene, so it
+	boots in seconds). #stopper stands in for index.html's Tracks button, which stops its click from
+	propagating. The Playwright script reads window.__audio. -->
+<a id="stopper" role="button">Tracks</a>
+<script>
+	document.getElementById( 'stopper' ).addEventListener( 'click', ( e ) => e.stopPropagation() );
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GameAudio } from './js/Audio.js';
+
+const camera = new THREE.PerspectiveCamera();
+const target = new THREE.Object3D();
+const audio = new GameAudio();
+audio.init( camera, target );
+
+// ?synthetic: fire script-made (untrusted) gestures before anything else. They carry no user
+// activation, so they must not count as unlocking the audio.
+if ( new URLSearchParams( location.search ).has( 'synthetic' ) ) {
+
+	window.dispatchEvent( new Event( 'touchstart' ) );
+	window.dispatchEvent( new Event( 'click' ) );
+	// Read in-page, before Playwright touches the page: its evaluate() calls carry a user gesture.
+	setTimeout( () => {
+
+		window.__afterSynthetic = { state: audio.listener.context.state, unlocked: audio.unlocked };
+
+	}, 200 );
+
+}
+
+window.__audio = audio;
+window.__ready = true;
+</script></body></html>

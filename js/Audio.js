@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createImpactBuffer } from './ImpactSound.js';
+import { AudioUnlock } from './AudioUnlock.js';
 // RPM range is owned by the engine synth; import it so the 0..1 gear model
 // here and the worklet's normalization can't drift apart.
 import { RPM_IDLE, RPM_MAX } from './EngineWorklet.js';
@@ -104,6 +105,7 @@ export class GameAudio {
 		this.impactPlayers = [];
 		this.impactIndex = 0;
 		this.distanceFilters = [];
+		this.unlock = null;
 		this.unlocked = false;
 
 		this.rpm = 0;
@@ -116,6 +118,10 @@ export class GameAudio {
 	// every source is a PositionalAudio child of it, panned and attenuated
 	// relative to the camera-mounted listener.
 	init( camera, target ) {
+
+		// iOS routes Web Audio through the "ambient" session, which the silent
+		// switch mutes; "playback" (Safari 16.4+) plays like a video does.
+		if ( navigator.audioSession ) navigator.audioSession.type = 'playback';
 
 		this.listener = new THREE.AudioListener();
 		camera.add( this.listener );
@@ -173,38 +179,22 @@ export class GameAudio {
 
 		} );
 
-		const unlock = () => {
+		// Starts the context on the first real gesture and again after an
+		// interruption; `unlocked` flips only once the context is running.
+		this.unlock = new AudioUnlock( ctx, { onUnlock: () => {
 
-			if ( this.unlocked ) return;
 			this.unlocked = true;
-
-			if ( ctx.state === 'suspended' ) ctx.resume();
-
 			this.startSounds();
 
-			window.removeEventListener( 'keydown', unlock );
-			window.removeEventListener( 'click', unlock );
-			window.removeEventListener( 'touchstart', unlock );
-
-		};
-
-		window.addEventListener( 'keydown', unlock );
-		window.addEventListener( 'click', unlock );
-		window.addEventListener( 'touchstart', unlock );
+		} } );
+		this.unlock.arm();
 
 		// Pause all audio when the tab is hidden; resume once it's visible
 		// again (only if the user has already interacted to unlock playback).
 		document.addEventListener( 'visibilitychange', () => {
 
-			if ( document.hidden ) {
-
-				if ( ctx.state === 'running' ) ctx.suspend();
-
-			} else if ( this.unlocked && ctx.state === 'suspended' ) {
-
-				ctx.resume();
-
-			}
+			if ( document.hidden ) this.unlock.suspendForHidden();
+			else this.unlock.resumeForVisible();
 
 		} );
 
