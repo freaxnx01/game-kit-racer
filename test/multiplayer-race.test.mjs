@@ -122,7 +122,9 @@ test( 'raceToResults_thenRematch_returnsToLobbyWithoutError', async () => {
 	const t = await hostWithGuest();
 	t.mp.start();
 	t.tick( 3000 );
+	t.tick( 20000 ); // Bo's 20 s lap has really happened before it is reported
 	t.session().deliver( 'g1', { type: 'lap', lap: 1, time: 20 } );
+	t.tick( 5000 );
 	t.game.lapTimer.onLap( 1, 25 );
 	t.tick( 16 );
 	assert.equal( t.mp.view().phase, 'results' );
@@ -207,5 +209,20 @@ test( 'noConnectionAfterTwentySeconds_showsStrictNetworkHint', async () => {
 	await t.mp.accept( 'g1', 'KR1.answer' );
 	t.tick( 20001 );
 	assert.equal( t.mp.view().message.key, 'mp.strictNetwork' );
+
+} );
+
+test( 'guestReportsLapsRightAfterGo_hostStillWins', async () => {
+
+	const t = await hostWithGuest();
+	t.mp.start();
+	t.tick( 3000 );
+	t.tick( 50 );
+	t.session().deliver( 'g1', { type: 'lap', lap: 1, time: 20 } ); // claims a 20 s lap 50 ms after GO
+	t.tick( 25000 );
+	t.game.lapTimer.onLap( 1, 25 );
+	t.tick( 16 );
+	assert.notEqual( t.mp.view().phase, 'results', 'the early lap was not accepted, so Bo has not finished' );
+	assert.equal( t.mp.view().positions[ 0 ].name, 'Ana' );
 
 } );

@@ -338,7 +338,7 @@ export class MultiplayerRace {
 				return this.session.broadcast( msg, from );
 
 			case 'lap':
-				if ( this.race.recordLap( from, msg.lap, msg.time ) && msg.lap === this.race.laps ) this.race.recordFinish( from, now );
+				if ( this.race.recordLap( from, msg.lap, msg.time, now ) && msg.lap === this.race.laps ) this.race.recordFinish( from, now );
 				return;
 
 			case 'ping':
@@ -506,7 +506,8 @@ export class MultiplayerRace {
 
 		if ( this.role === 'host' ) {
 
-			if ( this.race.recordLap( 'h', lap, time ) && last ) this.race.recordFinish( 'h', this.now() );
+			const now = this.now();
+			if ( this.race.recordLap( 'h', lap, time, now ) && last ) this.race.recordFinish( 'h', now );
 
 		} else {
 
