@@ -1,0 +1,67 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+	body { margin: 0; height: 100vh; background: #3a7; }
+	.corner-link { position: absolute; background: #fff; padding: 9px 18px; border-radius: 999px; font: 13px sans-serif; }
+	#tracks-button { bottom: 12px; left: 12px; }
+	#mp-button { bottom: 12px; left: 100px; }
+	#tracks-menu, #mp-panel { position: absolute; bottom: 56px; left: 12px; width: 200px; height: 60px; background: #fff; }
+	#tracks-menu[hidden], #mp-panel[hidden] { display: none; }
+</style></head><body>
+<!-- Stand-ins for index.html's Tracks menu and Lobby.js's #mp-button/#mp-panel — just enough DOM
+	(ids, hidden attribute, the same document-click-closes-the-menu listener as index.html) to check
+	CpuPanel's panel-closing interplay with them (review #10 should-fix 3) without pulling in three.js
+	or a real MultiplayerRace/Lobby. -->
+<a id="tracks-button" class="corner-link" role="button">Tracks</a>
+<div id="tracks-menu" hidden></div>
+<a id="mp-button" class="corner-link" role="button">Multiplayer</a>
+<div id="mp-panel" hidden></div>
+<script>
+	const menu = document.getElementById( 'tracks-menu' );
+	const tracksButton = document.getElementById( 'tracks-button' );
+	const setTracksOpen = ( open ) => { menu.hidden = ! open; };
+	tracksButton.addEventListener( 'click', ( e ) => { e.stopPropagation(); setTracksOpen( menu.hidden ); } );
+	document.addEventListener( 'click', ( e ) => { if ( ! menu.contains( e.target ) ) setTracksOpen( false ); } );
+
+	const mpPanel = document.getElementById( 'mp-panel' );
+	const mpButton = document.getElementById( 'mp-button' );
+	mpButton.addEventListener( 'click', () => { mpPanel.hidden = ! mpPanel.hidden; } );
+</script>
+<script type="module">
+// Headless check of the vs-CPU flow with a fake game (no three.js, no physics): real CpuPanel UI and
+// real CpuRace on the default circuit; the clock runs 20× faster so a 1-lap race ends in seconds.
+import { CpuPanel } from '../../js/ui/CpuPanel.js';
+import { CpuRace } from '../../js/race/CpuRace.js';
+
+const trackCells = [
+	[ - 3, - 3, 'track-corner', 16 ], [ - 2, - 3, 'track-straight', 22 ], [ - 1, - 3, 'track-straight', 22 ], [ 0, - 3, 'track-corner', 0 ],
+	[ - 3, - 2, 'track-straight', 0 ], [ 0, - 2, 'track-straight', 0 ], [ - 3, - 1, 'track-corner', 10 ], [ - 2, - 1, 'track-corner', 0 ],
+	[ 0, - 1, 'track-straight', 0 ], [ - 2, 0, 'track-straight', 10 ], [ 0, 0, 'track-finish', 0 ], [ - 2, 1, 'track-straight', 10 ],
+	[ 0, 1, 'track-straight', 0 ], [ - 2, 2, 'track-corner', 10 ], [ - 1, 2, 'track-straight', 16 ], [ 0, 2, 'track-corner', 22 ],
+];
+const broken = new URLSearchParams( location.search ).has( 'broken' );
+
+const lapTimer = {
+	onLap: null, running: false,
+	resetForRace() { this.running = false; }, startRace() { this.running = true; }, resetForSolo() { this.running = false; },
+	progress() { return 0; },
+};
+const opponents = {
+	trucks: new Map(),
+	add( id, name ) { this.trucks.set( id, { name, states: 0 } ); }, clear() { this.trucks.clear(); },
+	push( id ) { const t = this.trucks.get( id ); if ( t ) t.states ++; }, update() {},
+};
+const game = {
+	trackCells: broken ? trackCells.slice( 1 ) : trackCells, cellSize: 9.99 * 0.75, lapTimer, opponents,
+	placeOnSlot( slot ) { window.slot = slot; }, setHold( hold ) { window.hold = hold; },
+};
+
+const SPEEDUP = 20;
+const t0 = performance.now();
+const now = () => t0 + ( performance.now() - t0 ) * SPEEDUP;
+const panel = new CpuPanel();
+const race = new CpuRace( game, { onChange: ( view ) => panel.render( view ), now } );
+panel.bind( race );
+setInterval( () => race.update( SPEEDUP / 60 ), 16 );
+Object.assign( window, { race, panel, game } );
+window.ready = true;
+</script></body></html>

@@ -20,6 +20,9 @@ All notable changes to this project are documented here, following
   paste back their answer code, and race a countdown start over 1–10 laps with
   trucks you can bump into. Works without any server; strict company networks
   may block it (a phone hotspot helps). Available in German and English.
+- Race against the computer: **vs CPU** puts up to three CPU trucks on the grid —
+  pick easy, medium or hard and 1–10 laps. Works on every track that is one
+  closed circuit. Available in German and English.
 - New track "Bad Säckingen Altstadt" in the Tracks menu: start on the covered
   wooden bridge over the Rhine, cross to Stein AG, come back over the
   Fridolinsbrücke and race through the old-town lanes — with the real houses
