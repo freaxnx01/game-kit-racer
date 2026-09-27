@@ -49,6 +49,8 @@
 		#tracks-menu small { display: block; opacity: 0.6; font-size: 11.5px; margin-top: 1px; }
 		#github-link { top: 12px; right: 12px; padding: 8px; line-height: 0; }
 		#github-link svg { display: block; width: 20px; height: 20px; }
+		#load-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(10,12,14,0.55); }
+		#load-overlay[hidden] { display: none; }
 	</style>
 	<script type="importmap">
 	{
@@ -67,6 +69,7 @@
 	<a id="editor-link" class="corner-link" href="editor.html">Create new track</a>
 	<a id="tracks-button" class="corner-link" role="button" aria-haspopup="true" aria-expanded="false">Tracks</a>
 	<div id="tracks-menu" hidden></div>
+	<div id="load-overlay"></div>
 	<script>
 		const map = new URLSearchParams( location.search ).get( 'map' );
 		if ( map ) {
@@ -103,6 +106,19 @@
 
 		button.addEventListener( 'click', ( e ) => { e.stopPropagation(); setOpen( menu.hidden ); } );
 		document.addEventListener( 'click', ( e ) => { if ( ! menu.contains( e.target ) ) setOpen( false ); } );
+	</script>
+	<script type="module">
+		// Loading panel (#14): starts before js/main.js, whose CDN imports can take a while.
+		import { loadOverlay } from './js/ui/LoadOverlay.js';
+		import { LoadProgress, cancelTarget } from './js/LoadProgress.js';
+
+		const params = new URLSearchParams( location.search );
+		const stages = [ 'engine', 'models', 'track', 'lighting' ];
+		if ( params.get( 'map' ) && params.get( 'osm' ) ) stages.push( 'surroundings' );
+		const target = cancelTarget( location.href, document.referrer );
+		const progress = new LoadProgress( stages );
+		loadOverlay().start( progress, target ? () => location.replace( target ) : null );
+		progress.begin( 'engine' );
 	</script>
 	<script src="./version.js"></script>
 	<script src="./i18n.js"></script>
