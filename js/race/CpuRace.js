@@ -188,7 +188,7 @@ export class CpuRace {
 		while ( player.total === null && player.laps < Math.min( driver.lapsDone(), this.race.laps ) ) {
 
 			const lap = player.laps + 1;
-			if ( ! this.race.recordLap( id, lap, ( now - this.lapStart.get( id ) ) / 1000 ) ) return;
+			if ( ! this.race.recordLap( id, lap, ( now - this.lapStart.get( id ) ) / 1000, now ) ) return;
 			this.lapStart.set( id, now );
 			if ( lap === this.race.laps ) this.race.recordFinish( id, now );
 
@@ -200,7 +200,7 @@ export class CpuRace {
 
 		if ( ! this.race ) return;
 		const now = this.now();
-		if ( this.race.recordLap( YOU, lap, time ) && lap === this.race.laps ) this.race.recordFinish( YOU, now );
+		if ( this.race.recordLap( YOU, lap, time, now ) && lap === this.race.laps ) this.race.recordFinish( YOU, now );
 		this.changed( now );
 
 	}

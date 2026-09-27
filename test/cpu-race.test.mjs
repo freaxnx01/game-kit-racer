@@ -155,6 +155,7 @@ test( 'playerLap_viaLapTimerHook_isRecordedAndLastLapFinishes', () => {
 
 	const { game, race, step } = setup( { cpus: 1, difficulty: 'easy', laps: 2 } );
 	step( COUNTDOWN_MS );
+	step( 60000 );
 	game.lapTimer.onLap( 1, 30 );
 	game.lapTimer.onLap( 2, 29 );
 	const you = race.race.find( YOU );
@@ -214,5 +215,23 @@ test( 'rematch_afterResults_restartsWithTheSameSettings', () => {
 	assert.notEqual( game.lapTimer.onLap, 'solo-hook', 'race hook installed again' );
 	race.quit();
 	assert.equal( game.lapTimer.onLap, 'solo-hook' );
+
+} );
+
+// PR #8 makes RaceState.recordLap( id, lap, time, now ) reject a lap with no finite `now` — both
+// CpuRace call sites must pass it (currently ignored by RaceState.recordLap on this branch).
+test( 'recordLap_forCpuAndPlayerLaps_alwaysPassesAFiniteNow', () => {
+
+	const { game, race, step } = setup( { cpus: 1, difficulty: 'easy', laps: 2 } );
+	const original = race.race.recordLap.bind( race.race );
+	const nows = [];
+	race.race.recordLap = ( id, lap, time, now ) => { nows.push( now ); return original( id, lap, time, now ); };
+
+	step( COUNTDOWN_MS );
+	step( 60000 );
+	game.lapTimer.onLap( 1, 30 );
+
+	assert.ok( nows.length > 0, 'recordLap was called' );
+	assert.ok( nows.every( ( now ) => Number.isFinite( now ) ), 'every recordLap call passed a finite now' );
 
 } );
