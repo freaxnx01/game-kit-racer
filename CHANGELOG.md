@@ -30,6 +30,13 @@ All notable changes to this project are documented here, following
 - The OpenStreetMap track builder now also uses pedestrian zones, so old-town
   lanes can be part of a track.
 
+### Fixed
+
+- Sound on phones: the engine, skid and crash sounds now start with your first
+  steering touch (on an iPhone even with the silent switch on) and come back
+  after a phone call, a locked screen or switching apps. Opening the Tracks menu
+  first no longer leaves the game silent.
+
 ## [0.1.0] - 2026-09-24
 
 ### Added
