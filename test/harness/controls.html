@@ -1,0 +1,15 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head><body>
+<button id="btn" type="button">Start race</button>
+<input id="name">
+<script type="module">
+// Headless check for #16: Space throttles, never clicks a focused button, and still types in text fields.
+import { Controls } from '../../js/Controls.js';
+
+window.clicks = 0;
+document.getElementById( 'btn' ).addEventListener( 'click', () => window.clicks ++ );
+window.controls = new Controls();
+window.ready = true;
+</script>
+</body></html>
