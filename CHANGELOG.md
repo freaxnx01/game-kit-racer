@@ -30,6 +30,11 @@ All notable changes to this project are documented here, following
 - The OpenStreetMap track builder now also uses pedestrian zones, so old-town
   lanes can be part of a track.
 
+### Changed
+
+- Donuts: when you spin the truck on the spot, the camera now holds still instead
+  of swinging back and forth. It picks up following you again as soon as you drive off.
+
 ### Fixed
 
 - Sound on phones: the engine, skid and crash sounds now start with your first

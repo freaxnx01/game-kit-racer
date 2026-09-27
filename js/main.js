@@ -5,6 +5,7 @@ import { LightProbeGridHelper } from 'three/addons/helpers/LightProbeGridHelper.
 import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, enableCollision, registerAll, updateWorld, rigidBody, box, MotionType } from 'crashcat';
 import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
+import { SpinHold } from './SpinHold.js';
 import { Controls } from './Controls.js';
 import { buildTrack, decodeCells, encodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
@@ -303,6 +304,7 @@ async function init() {
 
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
+	const spinHold = new SpinHold();
 	const _up = new THREE.Vector3( 0, 1, 0 );
 
 	// Multiplayer (#1): other players' trucks, the lobby and the race controller.
@@ -413,7 +415,9 @@ async function init() {
 
 		const mv = vehicle.modelVelocity;
 		_camLead.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion ).multiplyScalar( Math.sqrt( mv.x * mv.x + mv.z * mv.z ) );
-		cam.update( dt, vehicle.spherePos, _camLead );
+		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+		spinHold.update( dt, Math.atan2( _forward.x, _forward.z ) );
+		cam.update( dt, vehicle.spherePos, _camLead, spinHold.hold );
 		particles.update( dt, vehicle );
 		driftMarks.update( dt, vehicle );
 		audio.update( dt, vehicle.linearSpeed / MAX_SPEED, input.z, vehicle.driftIntensity );
