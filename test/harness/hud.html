@@ -15,7 +15,19 @@ const param = { bbox: fixture.bbox, mpc: 10, offX, offZ };
 const f = osmFeatures( fixture, param, CELL );
 const area = viewArea( track, 8 );
 const hud = new Hud( track, CELL );
-const generic = new URLSearchParams( location.search ).has( 'generic' );
+const params = new URLSearchParams( location.search );
+const generic = params.has( 'generic' );
+if ( params.has( 'cpus' ) ) {
+	const centre = ( [ gx, gz ] ) => [ ( gx + 0.5 ) * CELL, ( gz + 0.5 ) * CELL ];
+	const quarter = ( k ) => track[ Math.floor( track.length * k / 4 ) ]; // spread round the loop so dots never overlap
+	const player = centre( quarter( 3 ) );
+	const markers = [ 0, 1, 2 ].map( ( colour ) => { const [ x, z ] = centre( quarter( colour ) ); return { x, z, colour }; } );
+	const under = { x: player[ 0 ], z: player[ 1 ], colour: 2 }; // a CPU exactly under the player: the arrow must win
+	hud.update( player[ 0 ], player[ 1 ], 1, 0, [ ...markers, under ] );
+	window.harness = { hud, markers, player };
+	window.__done = true;
+	await new Promise( () => {} ); // stop here
+}
 if ( generic ) {
 	hud.update( 0, 0, 0, 0 ); // no OSM layers, zero heading vector
 	window.__done = true;
