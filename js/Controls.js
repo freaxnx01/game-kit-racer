@@ -12,6 +12,18 @@ export function keyboardAxes( keys ) {
 
 }
 
+const EDITABLE_TAGS = [ 'INPUT', 'TEXTAREA', 'SELECT' ];
+
+// Space is the throttle, so its browser default (activating a focused button, scrolling) is
+// blocked — except in text fields and dropdowns, where Space keeps working normally.
+export function swallowsSpace( code, target ) {
+
+	if ( code !== 'Space' ) return false;
+	if ( ! target ) return true;
+	return ! EDITABLE_TAGS.includes( target.tagName ) && ! target.isContentEditable;
+
+}
+
 export class Controls {
 
 	constructor() {
@@ -28,8 +40,21 @@ export class Controls {
 		this.steerStartX = 0;
 		this.steerStartY = 0;
 
-		window.addEventListener( 'keydown', ( e ) => this.keys[ e.code ] = true );
-		window.addEventListener( 'keyup', ( e ) => this.keys[ e.code ] = false );
+		// Both events are prevented: browsers fire a focused button's click on Space keyup.
+
+		window.addEventListener( 'keydown', ( e ) => {
+
+			if ( swallowsSpace( e.code, e.target ) ) e.preventDefault();
+			this.keys[ e.code ] = true;
+
+		} );
+
+		window.addEventListener( 'keyup', ( e ) => {
+
+			if ( swallowsSpace( e.code, e.target ) ) e.preventDefault();
+			this.keys[ e.code ] = false;
+
+		} );
 
 		this.setupTouchUI();
 

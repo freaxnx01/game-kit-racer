@@ -32,6 +32,7 @@ All notable changes to this project are documented here, following
 - Racing against the CPU: the CPU trucks now show up as coloured dots (green,
   purple, red) on the minimap, so you can always see who's on your tail — even
   when they're off screen.
+- Accelerate with the space bar, too — it works just like `W` or `↑`.
 
 ### Changed
 
