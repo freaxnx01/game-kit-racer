@@ -17,10 +17,18 @@ const WALL_TONES = [ 0xf1e3c8, 0xe8c9b0, 0xd9dde4, 0xf3d9a4, 0xcfe0d1 ].map( ( c
 const ROOF_LIGHTEN = 0.35;
 
 // Fetch OSM for the link's bbox and add the surroundings to the scene.
-// Resolves { streets, buildings, index } for the HUD (world coordinates); rejects when Overpass fails.
-export async function loadSurroundings( scene, param, trackCells, area, cellSize ) {
+// Resolves { streets, buildings, index } for the HUD (world coordinates); rejects when Overpass fails
+// or `signal` is aborted — then nothing is added. onStep( 'fetch', { host, index, count } ) per
+// mirror tried, onStep( 'build', {} ) before the meshes are built.
+export async function loadSurroundings( scene, param, trackCells, area, cellSize, { signal = null, onStep = () => {} } = {} ) {
 
-	const { osm } = await fetchOverpass( overpassQuery( param.bbox, undefined, { buildings: true } ) );
+	const onTry = ( host, index, count ) => onStep( 'fetch', { host, index, count } );
+	const { osm } = await fetchOverpass( overpassQuery( param.bbox, undefined, { buildings: true } ), { signal, onTry } );
+	throwIfCancelled( signal );
+	onStep( 'build', {} );
+	await nextPaint();
+	throwIfCancelled( signal );
+
 	const { streets, buildings } = osmFeatures( osm, param, cellSize );
 
 	const sideStreets = clipStreets( streets, trackCells, area, cellSize );
@@ -32,6 +40,25 @@ export async function loadSurroundings( scene, param, trackCells, area, cellSize
 	if ( houseMesh ) scene.add( houseMesh );
 
 	return { streets: sideStreets, buildings: houses, index: new StreetIndex( streets, cellSize ) };
+
+}
+
+function throwIfCancelled( signal ) {
+
+	if ( signal?.aborted ) throw new DOMException( 'Loading cancelled', 'AbortError' );
+
+}
+
+// Lets the "building" label paint before the synchronous mesh work; the timeout keeps a
+// background tab (no animation frames) from stalling.
+function nextPaint() {
+
+	return new Promise( ( resolve ) => {
+
+		requestAnimationFrame( resolve );
+		setTimeout( resolve, 50 );
+
+	} );
 
 }
 
