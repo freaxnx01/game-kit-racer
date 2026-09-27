@@ -39,3 +39,12 @@ test( 'funnyName_everyDefault_isAValidPlayerName', () => {
 	assert.equal( funnyName( () => 0 ), FUNNY_NAMES[ 0 ] );
 
 } );
+
+test( 'STRINGS_loadingTexts_existInBothLanguages', () => {
+
+	const keys = [ 'load.engine', 'load.models', 'load.track', 'load.lighting', 'load.surroundings', 'load.fetch', 'load.build',
+		'load.cancel', 'load.back', 'load.failed', 'load.seconds', 'load.skipped', 'load.surroundingsFailed' ];
+	for ( const key of keys ) for ( const lang of [ 'en', 'de' ] ) assert.ok( STRINGS[ lang ][ key ], `${ lang } ${ key }` );
+	assert.equal( t( 'load.models', 'de', { done: 7, total: 11 } ), 'Modelle werden geladen (7/11)…' );
+
+} );
