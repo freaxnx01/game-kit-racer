@@ -19,7 +19,7 @@
 - Minimap size, position and phone-width layout unchanged.
 - Touch `js/race/CpuRace.js` and `js/main.js` only as described (one appended method, one changed line): issue #13 (CPU race fixes) edits the same files in parallel.
 - Code style = upstream mrdoob style: tabs, spaces inside parentheses/brackets, blank line after a block-opening `{` and before its `}`, `const`/`let`, no commented-out code. Test names `functionName_state_expectedBehavior`. Run all unit tests with `node --test test/*.test.mjs`.
-- CHANGELOG: hand-written player-facing entry under `[Unreleased]`, German, `Du`/`Dir` capitalised, real umlauts. Never run `git cliff -o CHANGELOG.md`.
+- CHANGELOG: hand-written player-facing entry under `[Unreleased]`, in English to match the existing entries. Never run `git cliff -o CHANGELOG.md`.
 - Commits: Conventional Commits with the two trailer lines shown in each commit step.
 
 ## Review Focus
@@ -344,9 +344,9 @@ Change nothing else in `main.js` (#13 edits the CPU wiring around it).
 In `CHANGELOG.md`, under `## [Unreleased]` → `### Added`, append as the last bullet:
 
 ```markdown
-- Rennen gegen den Computer: Die CPU-Trucks erscheinen jetzt als farbige Punkte
-  (grün, lila, rot) auf der Minimap — so siehst Du jederzeit, wer Dir im Nacken
-  sitzt, auch wenn er gerade nicht im Bild ist.
+- Racing against the CPU: the CPU trucks now show up as coloured dots (green,
+  purple, red) on the minimap, so you can always see who's on your tail — even
+  when they're off screen.
 ```
 
 - [ ] **Step 3: Verify**
