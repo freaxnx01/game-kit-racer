@@ -55,15 +55,18 @@ export class Camera {
 
 	}
 
-	update( dt, target, velocity ) {
+	// hold (0..1, from SpinHold): 1 = keep the camera still — no lead, no easing toward the truck.
+	// The deadzone hard-clamp below still applies, so the truck never leaves the circle.
+	update( dt, target, velocity, hold = 0 ) {
 
+		const follow = 1 - hold;
 		const radius = this.deadzoneRadius;
 		const radiusSq = radius * radius;
 
 		// Lead = velocity projected onto camera-aligned ground basis, scaled, clamped to the deadzone disk.
 		// Becomes the camera's offset from the car: car settles at the trailing edge of the circle.
-		let leadX = velocity.dot( this.camRightXZ ) * this.leadFactor;
-		let leadY = velocity.dot( this.camForwardXZ ) * this.leadFactor;
+		let leadX = velocity.dot( this.camRightXZ ) * this.leadFactor * follow;
+		let leadY = velocity.dot( this.camForwardXZ ) * this.leadFactor * follow;
 		const leadLenSq = leadX * leadX + leadY * leadY;
 		if ( leadLenSq > radiusSq ) {
 
@@ -77,7 +80,7 @@ export class Camera {
 			.addScaledVector( this.camRightXZ, leadX )
 			.addScaledVector( this.camForwardXZ, leadY );
 
-		const alpha = this.initialized ? 1 - Math.exp( - dt * this.cameraSmoothing ) : 1;
+		const alpha = this.initialized ? 1 - Math.exp( - dt * this.cameraSmoothing * follow ) : 1;
 		this.smoothedDesired.lerp( _desired, alpha );
 		this.initialized = true;
 

@@ -1,0 +1,63 @@
+<!DOCTYPE html><html><head><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Camera harness (#17): feeds the real Camera a simulated donut and a straight run, with and
+// without SpinHold, and reports how far the camera moves. No renderer — pure simulation.
+import * as THREE from 'three';
+import { Camera } from '../../js/Camera.js';
+import { SpinHold } from '../../js/SpinHold.js';
+
+const DT = 1 / 60;
+
+// Donut: truck circles radius 1 around the origin at 4 rad/s (full lock), facing along the circle.
+function donutFrame( t, car, lead ) {
+
+	const heading = 4 * t;
+	car.set( - Math.cos( heading ), 0.5, Math.sin( heading ) );
+	lead.set( Math.sin( heading ), 0, Math.cos( heading ) ).multiplyScalar( 4 ); // speed = r · ω
+	return heading;
+
+}
+
+// Straight: truck drives along +X at 4 units/s.
+function straightFrame( t, car, lead ) {
+
+	car.set( 4 * t, 0.5, 0 );
+	lead.set( 1, 0, 0 ).multiplyScalar( 4 );
+	return Math.PI / 2;
+
+}
+
+function run( frame, useHold, seconds, measureFrom ) {
+
+	const cam = new Camera();
+	const spinHold = new SpinHold();
+	const car = new THREE.Vector3(), lead = new THREE.Vector3();
+	const min = new THREE.Vector3( Infinity, Infinity, Infinity ), max = new THREE.Vector3( - Infinity, - Infinity, - Infinity );
+	const path = [];
+	for ( let i = 0; i < Math.round( seconds / DT ); i ++ ) {
+
+		const t = i * DT;
+		const heading = frame( t, car, lead );
+		spinHold.update( DT, Math.atan2( Math.sin( heading ), Math.cos( heading ) ) );
+		cam.update( DT, car, lead, useHold ? spinHold.hold : 0 );
+		path.push( cam.camera.position.x, cam.camera.position.z );
+		if ( t >= measureFrom ) { min.min( cam.camera.position ); max.max( cam.camera.position ); }
+
+	}
+
+	return { swing: Math.max( max.x - min.x, max.z - min.z ), path, hold: spinHold.hold };
+
+}
+
+const donutWithout = run( donutFrame, false, 5, 2 );
+const donutWith = run( donutFrame, true, 5, 2 );
+const straightWithout = run( straightFrame, false, 3, 0 );
+const straightWith = run( straightFrame, true, 3, 0 );
+window.result = {
+	swingWithout: donutWithout.swing,
+	swingWith: donutWith.swing,
+	donutHold: donutWith.hold,
+	straightHold: straightWith.hold,
+	straightIdentical: straightWith.path.every( ( v, i ) => v === straightWithout.path[ i ] ),
+};
+</script></body></html>
