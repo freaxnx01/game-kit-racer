@@ -3,6 +3,9 @@
 
 const MAP_W = 190, MAP_H = 130, PAD = 10;
 
+// CPU truck dots, by truck index — same order as TRUCKS in race/Opponents.js (green, purple, red).
+export const MARKER_COLOURS = [ '#3fbf5f', '#a066d6', '#e04848' ];
+
 const STYLE = `
 	#minimap {
 		position: absolute;
@@ -101,9 +104,12 @@ export class Hud {
 
 	}
 
-	// World position of the car and its forward direction (unit vector on the ground plane).
-	update( x, z, forwardX, forwardZ ) {
+	// World position of the car and its forward direction (unit vector on the ground plane);
+	// others: CPU trucks as { x, z, colour } (colour = truck index), drawn under the car.
+	update( x, z, forwardX, forwardZ, others = [] ) {
 
+		this.clearToStatic();
+		for ( const marker of others ) this.drawMarker( marker );
 		this.drawCar( x, z, forwardX, forwardZ );
 		if ( this.index ) this.showStreet( this.index.nameAt( x, z ) );
 
@@ -179,7 +185,7 @@ export class Hud {
 
 	}
 
-	drawCar( x, z, fx, fz ) {
+	clearToStatic() {
 
 		const ctx = this.ctx;
 		ctx.setTransform( 1, 0, 0, 1, 0, 0 );
@@ -187,6 +193,25 @@ export class Hud {
 		ctx.drawImage( this.staticLayer, 0, 0 );
 		ctx.scale( this.dpr, this.dpr );
 
+	}
+
+	drawMarker( { x, z, colour } ) {
+
+		const ctx = this.ctx;
+		const [ mx, mz ] = this.toMap( x, z );
+		ctx.fillStyle = MARKER_COLOURS[ colour % MARKER_COLOURS.length ];
+		ctx.strokeStyle = 'rgba(10,12,14,0.9)';
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.arc( mx, mz, 4, 0, Math.PI * 2 );
+		ctx.fill();
+		ctx.stroke();
+
+	}
+
+	drawCar( x, z, fx, fz ) {
+
+		const ctx = this.ctx;
 		const [ mx, mz ] = this.toMap( x, z );
 		const len = Math.hypot( fx, fz ) || 1;
 		const ux = fx / len, uz = fz / len;
