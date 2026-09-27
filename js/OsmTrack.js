@@ -62,9 +62,10 @@ function storeOnly( storage, key, value ) {
 }
 
 // Same query → same data: the latest answer is cached in storage (localStorage by default, null =
-// no cache) so a flaky Overpass only has to answer once. onTry( host ) is called before each mirror.
-// Resolves { osm, source }; rejects with every mirror's error when all fail.
-export async function fetchOverpass( query, { storage = defaultStorage(), fetchImpl = globalThis.fetch, timeoutMs = 45000, onTry = () => {} } = {} ) {
+// no cache) so a flaky Overpass only has to answer once. onTry( host, index, count ) is called before
+// each mirror (index 1-based). Resolves { osm, source }; rejects with every mirror's error when all
+// fail, or with an AbortError as soon as `signal` aborts (no further mirror is tried).
+export async function fetchOverpass( query, { storage = defaultStorage(), fetchImpl = globalThis.fetch, timeoutMs = 45000, onTry = () => {}, signal = null } = {} ) {
 
 	const key = CACHE_PREFIX + query;
 
@@ -77,29 +78,21 @@ export async function fetchOverpass( query, { storage = defaultStorage(), fetchI
 
 	const errors = [];
 
-	for ( const url of OVERPASS_MIRRORS ) {
+	for ( const [ i, url ] of OVERPASS_MIRRORS.entries() ) {
 
+		throwIfAborted( signal );
 		const host = new URL( url ).host;
-		onTry( host );
+		onTry( host, i + 1, OVERPASS_MIRRORS.length );
 
 		try {
 
-			const controller = new AbortController();
-			const timer = setTimeout( () => controller.abort(), timeoutMs );
-			const res = await fetchImpl( url, { method: 'POST', body: 'data=' + encodeURIComponent( query ), signal: controller.signal } );
-			clearTimeout( timer );
-			if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
-			const osm = await res.json();
-			if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
-			if ( PARTIAL_REMARK.test( osm.remark ?? '' ) ) throw new Error( osm.remark );
-			if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
-
+			const osm = await fetchMirror( url, query, { fetchImpl, timeoutMs, signal } );
 			try { storeOnly( storage, key, JSON.stringify( osm ) ); } catch {}
-
 			return { osm, source: host };
 
 		} catch ( e ) {
 
+			throwIfAborted( signal );
 			errors.push( `${ host }: ${ e.name === 'AbortError' ? 'timeout' : e.message }` );
 
 		}
@@ -107,6 +100,40 @@ export async function fetchOverpass( query, { storage = defaultStorage(), fetchI
 	}
 
 	throw new Error( errors.join( ' · ' ) );
+
+}
+
+// One mirror request, aborted by its own timeout or by the caller's signal.
+async function fetchMirror( url, query, { fetchImpl, timeoutMs, signal } ) {
+
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+	const timer = setTimeout( abort, timeoutMs );
+	signal?.addEventListener( 'abort', abort );
+	if ( signal?.aborted ) abort();
+
+	try {
+
+		const res = await fetchImpl( url, { method: 'POST', body: 'data=' + encodeURIComponent( query ), signal: controller.signal } );
+		if ( ! res.ok ) throw new Error( `HTTP ${ res.status }` );
+		const osm = await res.json();
+		if ( ! Array.isArray( osm.elements ) ) throw new Error( 'unexpected response' );
+		if ( PARTIAL_REMARK.test( osm.remark ?? '' ) ) throw new Error( osm.remark );
+		if ( osm.elements.length === 0 ) throw new Error( 'no data for this area' );
+		return osm;
+
+	} finally {
+
+		clearTimeout( timer );
+		signal?.removeEventListener( 'abort', abort );
+
+	}
+
+}
+
+function throwIfAborted( signal ) {
+
+	if ( signal?.aborted ) throw new DOMException( 'Loading cancelled', 'AbortError' );
 
 }
 
