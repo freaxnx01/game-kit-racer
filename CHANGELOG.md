@@ -33,6 +33,10 @@ All notable changes to this project are documented here, following
   purple, red) on the minimap, so you can always see who's on your tail — even
   when they're off screen.
 - Accelerate with the space bar, too — it works just like `W` or `↑`.
+- While a track loads you now see what is happening and how far along it is, in
+  percent. **Cancel** takes you back to the track you came from; while the real
+  houses of an OpenStreetMap track are still loading, it skips them and you drive
+  on without. Available in German and English.
 
 ### Changed
 
