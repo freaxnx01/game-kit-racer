@@ -447,7 +447,7 @@ async function init() {
 		updateGhost();
 
 		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
-		hud.update( vehicle.spherePos.x, vehicle.spherePos.z, _forward.x, _forward.z );
+		hud.update( vehicle.spherePos.x, vehicle.spherePos.z, _forward.x, _forward.z, cpuRace.markers() );
 
 		renderer.render( scene, cam.camera );
 
