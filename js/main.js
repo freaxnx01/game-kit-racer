@@ -332,6 +332,12 @@ async function init() {
 		cpuPanel.render( cpuRace.view() );
 
 	} } );
+	// A failed join still tears down the CPU race and resets to a solo lap timer before the async
+	// answer comes back, so quit it up front rather than relying on the onChange success path above.
+	const hostSession = multiplayer.host.bind( multiplayer );
+	const joinSession = multiplayer.join.bind( multiplayer );
+	multiplayer.host = ( ...args ) => { cpuRace.quit(); return hostSession( ...args ); };
+	multiplayer.join = ( ...args ) => { cpuRace.quit(); return joinSession( ...args ); };
 	cpuPanel.bind( cpuRace, { isBusy: () => !! multiplayer.view().role } );
 	lobby.bind( multiplayer );
 	const invite = parseInviteHash( window.location.hash );
