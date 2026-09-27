@@ -27,6 +27,8 @@ import { parseInviteHash } from './net/Signal.js';
 import { CpuRace } from './race/CpuRace.js';
 import { CpuPanel } from './ui/CpuPanel.js';
 import { OpponentContacts } from './race/OpponentContacts.js';
+import { loadOverlay } from './ui/LoadOverlay.js';
+import { t } from './ui/strings.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -69,6 +71,22 @@ window.addEventListener( 'resize', () => {
 
 } );
 
+const overlay = loadOverlay();
+const progress = overlay.progress;
+const uiLang = () => window.GG_LANG ?? 'en';
+
+// Lets the loading label paint before synchronous work; the timeout keeps a background tab from stalling.
+function nextPaint() {
+
+	return new Promise( ( resolve ) => {
+
+		requestAnimationFrame( resolve );
+		setTimeout( resolve, 50 );
+
+	} );
+
+}
+
 const loader = new ColorMapGLTFLoader();
 
 const modelNames = [
@@ -79,7 +97,9 @@ const modelNames = [
 
 const models = {};
 
-async function loadModels() {
+async function loadModels( onModelLoaded ) {
+
+	let loaded = 0;
 
 	const promises = modelNames.map( ( name ) =>
 		new Promise( ( resolve, reject ) => {
@@ -117,6 +137,8 @@ async function loadModels() {
 
 				}
 
+				loaded ++;
+				onModelLoaded( loaded, modelNames.length );
 				resolve();
 
 			}, undefined, reject );
@@ -128,10 +150,47 @@ async function loadModels() {
 
 }
 
+// OpenStreetMap surroundings load while the player already drives: the panel shrinks, and Cancel
+// aborts the download instead of leaving the track.
+function loadSurroundingsWithProgress( hud, osmParam, cells, area, cellSize ) {
+
+	const cancel = new AbortController();
+	overlay.compact();
+	overlay.setCancel( () => cancel.abort() );
+	progress.begin( 'surroundings' );
+	loadSurroundings( scene, osmParam, cells, area, cellSize, {
+		signal: cancel.signal,
+		onStep: ( phase, detail ) => progress.step( phase === 'build' ? 1 : 0, 2, { ...detail, phase } ),
+	} )
+		.then( ( layers ) => {
+
+			hud.setOsm( layers );
+			hud.note( '' );
+
+		} )
+		.catch( ( e ) => {
+
+			const skipped = e.name === 'AbortError';
+			if ( ! skipped ) console.warn( 'OSM surroundings unavailable:', e.message );
+			hud.note( t( skipped ? 'load.skipped' : 'load.surroundingsFailed', uiLang() ) );
+
+		} )
+		.finally( finishLoading );
+
+}
+
+function finishLoading() {
+
+	progress.finish();
+	overlay.hide();
+
+}
+
 async function init() {
 
 	registerAll();
-	await loadModels();
+	progress.begin( 'models' );
+	await loadModels( ( done, total ) => progress.step( done, total ) );
 
 	const mapParam = new URLSearchParams( window.location.search ).get( 'map' );
 	let customCells = null;
@@ -173,7 +232,11 @@ async function init() {
 	scene.fog.near = groundSize * 0.4;
 	scene.fog.far = groundSize * 0.8;
 
+	progress.begin( 'track' );
+	await nextPaint();
 	buildTrack( scene, models, customCells, { grassArea: osmArea } );
+	progress.begin( 'lighting' );
+	await nextPaint();
 
 	// Probes
 
@@ -281,27 +344,16 @@ async function init() {
 
 	if ( osmParam ) {
 
-		hud.note( 'Loading surroundings…' );
-		loadSurroundings( scene, osmParam, customCells, osmArea, cellSize )
-			.then( ( layers ) => {
-
-				hud.setOsm( layers );
-				hud.note( '' );
-
-			} )
-			.catch( ( e ) => {
-
-				console.warn( 'OSM surroundings unavailable:', e.message );
-				hud.note( 'Surroundings unavailable' );
-
-			} );
+		loadSurroundingsWithProgress( hud, osmParam, customCells, osmArea, cellSize );
 
 	} else if ( osmRaw !== null ) {
 
 		console.warn( 'OSM surroundings unavailable:', customCells ? 'malformed or too large &osm= value' : 'no valid ?map= track to place them around' );
-		hud.note( 'Surroundings unavailable' );
+		hud.note( t( 'load.surroundingsFailed', uiLang() ) );
 
 	}
+
+	if ( ! osmParam ) finishLoading();
 
 	const _forward = new THREE.Vector3();
 	const _camLead = new THREE.Vector3();
@@ -457,4 +509,9 @@ async function init() {
 
 }
 
-init();
+init().catch( ( e ) => {
+
+	console.error( 'Loading the track failed:', e );
+	overlay.fail();
+
+} );
