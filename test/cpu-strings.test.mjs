@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STRINGS, t } from '../js/ui/strings.js';
 
-const CPU_KEYS = [ 'cpu.button', 'cpu.title', 'cpu.opponents', 'cpu.difficulty', 'cpu.easy', 'cpu.medium', 'cpu.hard', 'cpu.quit', 'cpu.freeDrive', 'cpu.noLoop' ];
+const CPU_KEYS = [ 'cpu.button', 'cpu.title', 'cpu.opponents', 'cpu.difficulty', 'cpu.easy', 'cpu.medium', 'cpu.hard', 'cpu.quit', 'cpu.freeDrive', 'cpu.noLoop', 'cpu.restart', 'cpu.running' ];
 
 test( 'STRINGS_cpuKeys_existInBothLanguages', () => {
 
@@ -15,5 +15,13 @@ test( 'STRINGS_cpuKeys_existInBothLanguages', () => {
 	}
 
 	assert.equal( t( 'cpu.button', 'de' ), 'Gegen CPU' );
+
+} );
+
+test( 'STRINGS_raceControls_readNaturallyInGerman', () => {
+
+	assert.equal( t( 'cpu.restart', 'de' ), 'Neu starten' );
+	assert.equal( t( 'cpu.running', 'de' ), 'Rennen läuft' );
+	assert.equal( t( 'cpu.restart', 'en' ), 'Restart race' );
 
 } );

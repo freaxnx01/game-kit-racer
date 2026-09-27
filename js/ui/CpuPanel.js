@@ -8,6 +8,8 @@ import { MAX_CPUS, YOU } from '../race/CpuRace.js';
 
 const DIFFICULTIES = [ 'easy', 'medium', 'hard' ];
 
+const isRacing = ( phase ) => phase === 'countdown' || phase === 'racing';
+
 const STYLE = `
 	#cpu-button { bottom: 12px; left: 236px; cursor: pointer; }
 	#cpu-panel {
@@ -34,7 +36,8 @@ const STYLE = `
 		background: rgba(0,0,0,0.5); color: #fff; font: 600 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; z-index: 10;
 	}
 	#cpu-positions .you { color: #f2c94c; }
-	#cpu-positions button { margin-top: 6px; font: inherit; font-size: 11px; background: rgba(255,255,255,0.2); color: #fff; border: none; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+	#cpu-positions button { margin: 8px 6px 0 0; font: inherit; font-size: 12px; background: rgba(255,255,255,0.22); color: #fff; border: none; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+	#cpu-positions button:hover { background: rgba(255,255,255,0.35); }
 	#cpu-countdown {
 		position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); color: #fff; pointer-events: none; z-index: 22;
 		font: 800 120px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-shadow: 0 4px 20px rgba(0,0,0,0.5);
@@ -75,6 +78,7 @@ export class CpuPanel {
 		this.closingLobby = false;
 		this.view = { available: true, settings: { cpus: 3, difficulty: 'medium', laps: 3 }, phase: null, positions: [], results: null, countdown: null, laps: 3 };
 		this.structure = '';
+		this.wasRacing = false;
 
 		const style = document.createElement( 'style' );
 		style.textContent = STYLE;
@@ -87,8 +91,9 @@ export class CpuPanel {
 		document.getElementById( 'mp-button' )?.addEventListener( 'click', () => { if ( ! this.closingLobby ) this.close(); } );
 		this.panel = el( 'div', { id: 'cpu-panel', hidden: true } );
 		this.positionsList = el( 'div' );
-		this.quitButton = el( 'button', { on: { click: () => this.race?.quit() } } );
-		this.positionsEl = el( 'div', { id: 'cpu-positions', hidden: true }, this.positionsList, this.quitButton );
+		this.restartButton = el( 'button', { id: 'cpu-restart', on: { click: ( e ) => this.act( e, () => this.race?.rematch() ) } } );
+		this.quitButton = el( 'button', { id: 'cpu-quit', on: { click: ( e ) => this.act( e, () => this.race?.quit() ) } } );
+		this.positionsEl = el( 'div', { id: 'cpu-positions', hidden: true }, this.positionsList, this.restartButton, this.quitButton );
 		this.countdownEl = el( 'div', { id: 'cpu-countdown', hidden: true } );
 		document.body.append( this.button, this.panel, this.positionsEl, this.countdownEl );
 
@@ -97,6 +102,7 @@ export class CpuPanel {
 		this.lapsSelect = el( 'select' );
 
 		window.addEventListener( 'gg-langchange', () => this.render( this.view, true ) );
+		window.addEventListener( 'keydown', ( e ) => this.onKey( e ) );
 		this.render( this.view, true );
 
 	}
@@ -125,6 +131,22 @@ export class CpuPanel {
 
 	}
 
+	// Runs a race button's action and drops focus, so a later Space/Enter (Space is throttle, #16) cannot
+	// re-trigger it through native button activation.
+	act( event, action ) {
+
+		event.currentTarget.blur();
+		action();
+
+	}
+
+	onKey( event ) {
+
+		if ( event.code !== 'Escape' || ! isRacing( this.view.phase ) ) return;
+		this.race?.quit();
+
+	}
+
 	// Pre-#8 Lobby.js has no public close() to call, so close it the same way it closes the Tracks
 	// menu: dispatch a click on its own button, which only ever toggles it shut here since it's open.
 	closeMultiplayerLobby() {
@@ -146,8 +168,9 @@ export class CpuPanel {
 	render( view, force = false ) {
 
 		this.view = view;
-		const racing = view.phase === 'countdown' || view.phase === 'racing';
-		if ( racing ) this.open = false;
+		const racing = isRacing( view.phase );
+		if ( racing && ! this.wasRacing ) this.open = false; // a race that just started closes the panel; "vs CPU" reopens it
+		this.wasRacing = racing;
 		if ( view.phase === 'results' ) this.open = true;
 
 		const key = JSON.stringify( [ this.open, this.lang, view.available, view.settings, view.phase, view.results, this.isBusy() ] );
@@ -171,6 +194,7 @@ export class CpuPanel {
 		const parts = [ el( 'h2', { text: t( 'cpu.title', L ) } ) ];
 
 		if ( view.phase === 'results' ) parts.push( ...this.resultsPart( view ) );
+		else if ( isRacing( view.phase ) ) parts.push( ...this.runningPart() );
 		else if ( ! view.available ) parts.push( el( 'div', { className: 'message', text: t( 'cpu.noLoop', L ) } ) );
 		else parts.push( ...this.settingsPart( view ) );
 
@@ -196,6 +220,26 @@ export class CpuPanel {
 			el( 'label', { text: t( 'cpu.difficulty', L ) } ), this.difficultySelect,
 			el( 'label', { text: t( 'mp.laps', L ) } ), this.lapsSelect,
 			el( 'button', { className: 'primary', text: t( 'mp.start', L ), disabled: this.isBusy(), on: { click: () => this.race.start( settings() ) } } ),
+		];
+
+	}
+
+	// "vs CPU" clicked during a race: restart or quit it from here too.
+	runningPart() {
+
+		const L = this.lang;
+		const leave = ( action ) => ( e ) => {
+
+			this.open = false;
+			this.act( e, action );
+			this.render( this.race.view() );
+
+		};
+
+		return [
+			el( 'div', { text: t( 'cpu.running', L ) } ),
+			el( 'button', { className: 'primary', text: t( 'cpu.restart', L ), on: { click: leave( () => this.race.rematch() ) } } ),
+			el( 'button', { text: t( 'cpu.quit', L ), on: { click: leave( () => this.race.quit() ) } } ),
 		];
 
 	}
@@ -226,13 +270,14 @@ export class CpuPanel {
 		this.countdownEl.hidden = ! view.countdown;
 		if ( view.countdown ) this.countdownEl.textContent = view.countdown === 'go' ? t( 'mp.go', L ) : view.countdown;
 
-		const racing = view.phase === 'countdown' || view.phase === 'racing';
+		const racing = isRacing( view.phase );
 		this.positionsEl.hidden = ! racing;
 		if ( ! racing ) return;
 
 		const rows = view.positions.map( ( p, i ) => el( 'div', { className: p.you ? 'you' : '',
 			text: `P${ i + 1 } ${ p.you ? t( 'mp.you', L ) : p.name } · ${ t( 'mp.lapOf', L, { lap: p.lap, laps: view.laps } ) }` } ) );
 		this.positionsList.replaceChildren( ...rows );
+		this.restartButton.textContent = t( 'cpu.restart', L );
 		this.quitButton.textContent = t( 'cpu.quit', L );
 
 	}
