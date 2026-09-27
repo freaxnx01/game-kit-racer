@@ -321,13 +321,15 @@ async function init() {
 
 	// CPU opponents (#4): same adapter as multiplayer, its own set of opponent trucks.
 	const cpuPanel = new CpuPanel();
-	const cpuRace = new CpuRace( { ...game, opponents: new Opponents( scene, world, models ) }, { onChange: ( view ) => cpuPanel.render( view ) } );
+	const cpuRace = new CpuRace( { ...game, opponents: new Opponents( scene, world, models ) },
+		{ onChange: ( view ) => cpuPanel.render( view ), isBusy: () => !! multiplayer.view().role } );
 
 	const lobby = new Lobby( { canRace: !! finishCell } );
 	const multiplayer = new MultiplayerRace( game, { onChange: ( view ) => {
 
 		if ( view.role ) cpuRace.quit(); // creating or joining a multiplayer session ends a CPU race
 		lobby.render( view );
+		cpuPanel.render( cpuRace.view() );
 
 	} } );
 	cpuPanel.bind( cpuRace, { isBusy: () => !! multiplayer.view().role } );

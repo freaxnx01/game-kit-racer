@@ -46,11 +46,12 @@ export function laneOf( slot, finishCell, cellSize ) {
 
 export class CpuRace {
 
-	constructor( game, { onChange = null, now = () => performance.now() } = {} ) {
+	constructor( game, { onChange = null, now = () => performance.now(), isBusy = () => false } = {} ) {
 
 		this.game = game;
 		this.onChange = onChange;
 		this.now = now;
+		this.isBusy = isBusy;
 		this.path = buildPath( game.trackCells, game.cellSize );
 		this.finishCell = game.trackCells.find( ( c ) => c[ 2 ] === 'track-finish' ) ?? null;
 		this.settings = { ...DEFAULT_SETTINGS };
@@ -72,7 +73,7 @@ export class CpuRace {
 	// Sets up the grid and starts the countdown. Returns false when CPU races are not available.
 	start( settings ) {
 
-		if ( ! this.available ) return false;
+		if ( ! this.available || this.isBusy() ) return false;
 		this.teardown();
 		this.settings = cleanSettings( settings );
 		const { cpus, laps, difficulty } = this.settings;

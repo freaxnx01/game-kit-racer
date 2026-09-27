@@ -235,3 +235,13 @@ test( 'recordLap_forCpuAndPlayerLaps_alwaysPassesAFiniteNow', () => {
 	assert.ok( nows.every( ( now ) => Number.isFinite( now ) ), 'every recordLap call passed a finite now' );
 
 } );
+
+test( 'start_whileBusyWithAMultiplayerSession_refuses', () => {
+
+	const game = fakeGame();
+	const race = new CpuRace( game, { now: () => 0, isBusy: () => true } );
+	assert.equal( race.start( {} ), false );
+	assert.equal( game.hold, false );
+	assert.equal( game.lapTimer.raceResets, 0 );
+
+} );
