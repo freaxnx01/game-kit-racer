@@ -45,6 +45,8 @@ export const STRINGS = {
 		'mp.connecting': 'Connecting…',
 		'mp.close': 'Close',
 		'mp.noFinish': 'This track has no finish line — pick another one to race.',
+		'mp.otherTrack': 'The host is racing on another track. Open it, then ask the host for a new invite.',
+		'mp.openHostTrack': 'Open the host’s track',
 	},
 
 	de: {
@@ -89,6 +91,8 @@ export const STRINGS = {
 		'mp.connecting': 'Verbinde…',
 		'mp.close': 'Schliessen',
 		'mp.noFinish': 'Diese Strecke hat keine Ziellinie — wähl eine andere zum Rennen.',
+		'mp.otherTrack': 'Der Gastgeber fährt auf einer anderen Strecke. Öffne sie und bitte ihn dann um eine neue Einladung.',
+		'mp.openHostTrack': 'Strecke des Gastgebers öffnen',
 	},
 
 };

@@ -122,7 +122,9 @@ test( 'raceToResults_thenRematch_returnsToLobbyWithoutError', async () => {
 	const t = await hostWithGuest();
 	t.mp.start();
 	t.tick( 3000 );
+	t.tick( 20000 ); // Bo's 20 s lap has really happened before it is reported
 	t.session().deliver( 'g1', { type: 'lap', lap: 1, time: 20 } );
+	t.tick( 5000 );
 	t.game.lapTimer.onLap( 1, 25 );
 	t.tick( 16 );
 	assert.equal( t.mp.view().phase, 'results' );
@@ -180,6 +182,25 @@ test( 'guestSetup_startsCountdownOnItsSlotMinusHalfRtt', async () => {
 
 } );
 
+test( 'guestSetup_otherTrack_leavesAndOffersTheHostTrack', async () => {
+
+	const t = setup();
+	t.game.pageUrl = 'https://example.test/game/index.html?map=fYYN#join=KR1.offer-g1';
+	await t.mp.join( 'KR1.offer-g1', 'Bo' );
+	t.session().connect( 'h' );
+	t.session().deliver( 'h', { type: 'roster', you: 'g1', players: [ { id: 'h', name: 'Ana', slot: 0, connected: true }, { id: 'g1', name: 'Bo', slot: 1, connected: true } ] } );
+	t.session().deliver( 'h', { type: 'setup', map: 'OtherTrack', osm: '47.548,7.98,47.556,7.995,10,-1,-3', laps: 2, startIn: 3000 } );
+
+	const view = t.mp.view();
+	assert.equal( view.role, null );
+	assert.equal( view.phase, 'lobby' );
+	assert.equal( view.message.key, 'mp.otherTrack' );
+	assert.equal( view.hostTrack, 'https://example.test/game/index.html?map=OtherTrack&osm=47.548,7.98,47.556,7.995,10,-1,-3' );
+	assert.ok( t.session().sent.some( ( s ) => s.to === 'h' && s.msg.type === 'leave' ) );
+	assert.equal( t.game.hold, false );
+
+} );
+
 test( 'noConnectionAfterTwentySeconds_showsStrictNetworkHint', async () => {
 
 	const t = setup();
@@ -188,5 +209,20 @@ test( 'noConnectionAfterTwentySeconds_showsStrictNetworkHint', async () => {
 	await t.mp.accept( 'g1', 'KR1.answer' );
 	t.tick( 20001 );
 	assert.equal( t.mp.view().message.key, 'mp.strictNetwork' );
+
+} );
+
+test( 'guestReportsLapsRightAfterGo_hostStillWins', async () => {
+
+	const t = await hostWithGuest();
+	t.mp.start();
+	t.tick( 3000 );
+	t.tick( 50 );
+	t.session().deliver( 'g1', { type: 'lap', lap: 1, time: 20 } ); // claims a 20 s lap 50 ms after GO
+	t.tick( 25000 );
+	t.game.lapTimer.onLap( 1, 25 );
+	t.tick( 16 );
+	assert.notEqual( t.mp.view().phase, 'results', 'the early lap was not accepted, so Bo has not finished' );
+	assert.equal( t.mp.view().positions[ 0 ].name, 'Ana' );
 
 } );

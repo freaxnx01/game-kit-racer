@@ -18,6 +18,12 @@ test( 'STRINGS_placeholders_matchAcrossLanguages', () => {
 
 } );
 
+test( 'STRINGS_otherTrackTexts_existInBothLanguages', () => {
+
+	for ( const key of [ 'mp.otherTrack', 'mp.openHostTrack' ] ) for ( const lang of [ 'en', 'de' ] ) assert.ok( STRINGS[ lang ][ key ], `${ lang } ${ key }` );
+
+} );
+
 test( 't_placeholdersAndFallbacks_work', () => {
 
 	assert.equal( t( 'mp.lapOf', 'de', { lap: 2, laps: 3 } ), 'Runde 2/3' );

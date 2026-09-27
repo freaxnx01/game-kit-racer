@@ -4,7 +4,7 @@
 // their content and focus; timers and positions update in place.
 
 import { t, funnyName } from './strings.js';
-import { MAX_LAPS } from '../net/Protocol.js';
+import { MAX_LAPS, cleanName } from '../net/Protocol.js';
 
 const STYLE = `
 	#mp-button { bottom: 12px; left: 100px; cursor: pointer; }
@@ -14,6 +14,7 @@ const STYLE = `
 		box-shadow: 0 10px 30px rgba(0,0,0,0.25); font: 400 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 		color: #1f2430; z-index: 21; box-sizing: border-box;
 	}
+	@media (max-width: 760px) { #mp-panel { bottom: 100px; max-height: calc(100vh - 184px); } }
 	#mp-panel[hidden], #mp-positions[hidden], #mp-countdown[hidden] { display: none; }
 	#mp-panel h2 { font-size: 15px; margin: 0 0 10px; }
 	#mp-panel label { display: block; margin: 10px 0 4px; color: #4a5260; }
@@ -27,6 +28,7 @@ const STYLE = `
 	#mp-panel .invite { margin-top: 10px; padding: 10px; background: #f5f6f8; border-radius: 10px; }
 	#mp-panel .muted { color: #6b7280; font-size: 12px; margin-top: 6px; }
 	#mp-panel .message { color: #b45309; margin-top: 10px; }
+	#mp-panel a.host-track { display: inline-block; margin-top: 8px; color: #1f2430; font-weight: 600; }
 	#mp-panel ul { list-style: none; padding: 0; margin: 6px 0 0; }
 	#mp-panel li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
 	#mp-panel table { width: 100%; border-collapse: collapse; margin-top: 6px; }
@@ -101,7 +103,9 @@ export class Lobby {
 		style.textContent = STYLE;
 		document.head.appendChild( style );
 
-		this.button = el( 'a', { id: 'mp-button', className: 'corner-link', role: 'button', on: { click: ( e ) => { e.stopPropagation(); this.toggle(); } } } );
+		// The click reaches document, so index.html closes its Tracks menu; opening Tracks closes this panel.
+		this.button = el( 'a', { id: 'mp-button', className: 'corner-link', role: 'button', on: { click: () => this.toggle() } } );
+		document.getElementById( 'tracks-button' )?.addEventListener( 'click', () => this.close() );
 		this.panel = el( 'div', { id: 'mp-panel', hidden: true } );
 		this.positionsList = el( 'div' );
 		this.leaveButton = el( 'button', { on: { click: () => { if ( confirm( t( 'mp.leaveConfirm', this.lang ) ) ) this.mp.leave(); } } } );
@@ -141,6 +145,14 @@ export class Lobby {
 
 	}
 
+	close() {
+
+		if ( ! this.open ) return;
+		this.open = false;
+		this.render( this.view, true );
+
+	}
+
 	get lang() {
 
 		return window.GG_LANG ?? 'en';
@@ -149,13 +161,14 @@ export class Lobby {
 
 	render( view, force = false ) {
 
+		const newHostTrack = view.hostTrack && view.hostTrack !== this.view.hostTrack;
 		this.view = view;
 		const racing = view.phase === 'countdown' || view.phase === 'racing';
 		if ( racing ) this.open = false;
-		if ( view.phase === 'results' ) this.open = true;
+		if ( view.phase === 'results' || newHostTrack ) this.open = true;
 
 		const key = JSON.stringify( [ this.open, this.joining, this.lang, view.role, view.phase, view.you, view.laps, view.players,
-			view.invites?.map( ( i ) => [ i.peerId, i.secondsLeft === 0 ] ), view.answerCode, view.results, view.message, view.finished ] );
+			view.invites?.map( ( i ) => [ i.peerId, i.secondsLeft === 0 ] ), view.answerCode, view.results, view.message, view.hostTrack, view.finished ] );
 
 		if ( force || key !== this.structure ) {
 
@@ -181,6 +194,7 @@ export class Lobby {
 		else parts.push( ...this.guestLobby( view ) );
 
 		if ( view.message ) parts.push( el( 'div', { className: 'message', text: t( view.message.key, L, view.message.vars ) } ) );
+		if ( view.hostTrack ) parts.push( el( 'a', { className: 'host-track', href: view.hostTrack, text: t( 'mp.openHostTrack', L ) } ) );
 		if ( view.role ) parts.push( el( 'button', { text: t( 'mp.leave', L ), on: { click: () => this.mp.leave() } } ) );
 		return parts;
 
@@ -353,8 +367,7 @@ export class Lobby {
 
 	name() {
 
-		const name = this.nameInput.value.replace( /[ -]/g, '' ).trim().slice( 0, 16 );
-		return name || funnyName();
+		return cleanName( this.nameInput.value ) ?? funnyName();
 
 	}
 

@@ -1,7 +1,8 @@
 // Run: node --test test/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validate, parseMessage, cleanName, MAX_MESSAGE_CHARS } from '../js/net/Protocol.js';
+import { readFileSync } from 'node:fs';
+import { validate, parseMessage, readMessage, cleanName, MAX_MESSAGE_CHARS } from '../js/net/Protocol.js';
 
 const BOUNDS = { minX: - 50, maxX: 50, minZ: - 50, maxZ: 50 };
 
@@ -67,8 +68,36 @@ test( 'parseMessage_largeSetup_isAllowedUpToItsOwnLimit', () => {
 
 test( 'cleanName_controlCharactersAndSpaces_areStripped', () => {
 
-	assert.equal( cleanName( '  Bo\n ' ), 'Bo' );
+	assert.equal( cleanName( '  Bo\x07\n ' ), 'Bo' );
 	assert.equal( cleanName( '   ' ), null );
 	assert.equal( cleanName( 'Zoë Müller' ), 'Zoë Müller' );
+
+} );
+
+test( 'cleanName_everyControlCharacter_isStripped', () => {
+
+	assert.equal( cleanName( '\x00B\x1fo\u007f' ), 'Bo' );
+
+} );
+
+test( 'sources_nameCleaningFiles_containNoRawControlCharacters', () => {
+
+	for ( const file of [ 'js/net/Protocol.js', 'js/ui/Lobby.js', 'test/protocol.test.mjs' ] ) {
+
+		const text = readFileSync( new URL( '../' + file, import.meta.url ), 'utf8' );
+		assert.equal( /[\x00-\x08\x0b-\x1f\x7f]/.test( text ), false, file );
+
+	}
+
+} );
+
+test( 'readMessage_outOfBoundsStateVsMalformed_areToldApart', () => {
+
+	assert.deepEqual( readMessage( JSON.stringify( VALID.state ), BOUNDS ), { kind: 'deliver', msg: VALID.state } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, p: [ 999, 0.5, 0 ] } ), BOUNDS ), { kind: 'ignore' } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, p: [ 0, 99, 0 ] } ), BOUNDS ), { kind: 'ignore' } );
+	assert.deepEqual( readMessage( JSON.stringify( { ...VALID.state, v: [ 500, 0, 0 ] } ), BOUNDS ), { kind: 'drop' } );
+	assert.deepEqual( readMessage( JSON.stringify( { type: 'hello', name: '' } ), BOUNDS ), { kind: 'drop' } );
+	assert.deepEqual( readMessage( '{not json', BOUNDS ), { kind: 'drop' } );
 
 } );

@@ -6,6 +6,7 @@ import { MAX_PLAYERS } from '../net/Protocol.js';
 export const PHASE = { LOBBY: 'lobby', COUNTDOWN: 'countdown', RACING: 'racing', RESULTS: 'results' };
 export const COUNTDOWN_MS = 3000;
 export const RESULTS_GRACE_MS = 30000;
+export const PACE_SLACK_MS = 2000; // network latency + a guest's half-round-trip start estimate
 export const MAX_AVG_SPEED = 40; // world units/s — about three times the fastest lap anyone drives
 
 const ORIENT_DEG = { 0: 0, 10: 180, 16: 90, 22: 270 }; // same table as Track.js
@@ -51,7 +52,7 @@ export class RaceState {
 		this.minLap = minLapSeconds( cellCount, cellSize );
 		this.laps = laps;
 		this.phase = PHASE.LOBBY;
-		this.players = [];        // { id, name, slot, connected, left, laps, lapTimes, total, best }
+		this.players = [];        // { id, name, slot, connected, left, laps, lapTimes, total, best, finishedAt }
 		this.startAt = null;
 		this.firstFinishAt = null;
 
@@ -131,12 +132,17 @@ export class RaceState {
 
 	}
 
-	// A lap report from a player. Rejected when not racing, out of order, or implausibly fast.
-	recordLap( id, lap, time ) {
+	// A lap report from a player, at host time now (ms). Rejected when not racing, out of order,
+	// implausibly fast, or when the claimed running total is ahead of the race time the host has seen
+	// pass — so laps cannot be reported early. Peer-to-peer can only bound cheating this far: a client
+	// may still claim minLap per lap, but not finish sooner than it claims.
+	recordLap( id, lap, time, now ) {
 
 		const p = this.find( id );
-		if ( ! p || p.left || this.phase !== PHASE.RACING ) return false;
+		if ( ! p || p.left || this.phase !== PHASE.RACING || ! Number.isFinite( now ) ) return false;
 		if ( lap !== p.laps + 1 || lap > this.laps || time < this.minLap ) return false;
+		const claimedMs = ( p.lapTimes.reduce( ( a, b ) => a + b, 0 ) + time ) * 1000;
+		if ( now - this.startAt < claimedMs - PACE_SLACK_MS ) return false;
 		p.laps = lap;
 		p.lapTimes.push( time );
 		return true;
@@ -150,18 +156,21 @@ export class RaceState {
 		if ( ! p || p.total !== null || p.laps !== this.laps ) return false;
 		p.total = p.lapTimes.reduce( ( a, b ) => a + b, 0 );
 		p.best = Math.min( ...p.lapTimes );
+		p.finishedAt = now;
 		if ( this.firstFinishAt === null ) this.firstFinishAt = now;
 		return true;
 
 	}
 
-	// Live order: finished players by total time, then everyone else by laps and progress (0..1).
+	// Live order: finished players by when the host saw them finish (reported totals only break ties —
+	// a guest's lap times are not trusted), then everyone else by laps and progress (0..1).
 	standings( progressById ) {
 
 		const key = ( p ) => p.laps + ( progressById.get( p.id ) ?? 0 );
 		return this.players.filter( ( p ) => ! p.left ).slice().sort( ( a, b ) => {
 
-			if ( a.total !== null || b.total !== null ) return ( a.total ?? Infinity ) - ( b.total ?? Infinity );
+			if ( a.total !== null && b.total !== null ) return a.finishedAt - b.finishedAt || a.total - b.total;
+			if ( a.total !== null || b.total !== null ) return a.total === null ? 1 : - 1;
 			return key( b ) - key( a );
 
 		} ).map( ( p ) => p.id );
@@ -203,6 +212,6 @@ export class RaceState {
 
 function freshRace() {
 
-	return { laps: 0, lapTimes: [], total: null, best: null };
+	return { laps: 0, lapTimes: [], total: null, best: null, finishedAt: null };
 
 }
