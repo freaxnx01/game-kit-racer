@@ -4,7 +4,9 @@
 
 export const SAMPLE_INTERVAL = 0.05; // seconds between recorded samples (20 Hz)
 export const MAX_LAP_SECONDS = 300;  // longer laps are not kept as a ghost
+export const MAX_STORED_GHOSTS = 5;  // ghosts kept across all tracks, LRU-evicted (shared origin quota)
 const STORAGE_PREFIX = 'racing.ghost.';
+const INDEX_KEY = STORAGE_PREFIX + 'index';
 const FORMAT = 1;
 const STRIDE = 8;
 
@@ -119,11 +121,79 @@ export function loadGhost( key, storage ) {
 
 }
 
-export function saveGhost( key, ghost, storage ) {
+// Reads racing.ghost.index (MRU-first list of ghost storage keys), tolerating a missing or corrupt value.
+function readGhostIndex( storage ) {
 
 	try {
 
-		( storage || globalThis.localStorage ).setItem( key, encodeGhost( ghost ) );
+		const data = JSON.parse( storage.getItem( INDEX_KEY ) );
+		return Array.isArray( data ) ? data.filter( ( k ) => typeof k === 'string' ) : [];
+
+	} catch {
+
+		return [];
+
+	}
+
+}
+
+// Existing racing.ghost.* keys not (yet) listed in the index, so they become evictable too.
+function strayGhostKeys( storage, known ) {
+
+	const strays = [];
+	for ( let i = 0; i < storage.length; i ++ ) {
+
+		const k = storage.key( i );
+		if ( k && k.startsWith( STORAGE_PREFIX ) && k !== INDEX_KEY && ! known.includes( k ) ) strays.push( k );
+
+	}
+
+	return strays;
+
+}
+
+export function saveGhost( key, ghost, storage ) {
+
+	storage = storage || globalThis.localStorage;
+	try {
+
+		const text = encodeGhost( ghost );
+		const index = readGhostIndex( storage ).filter( ( k ) => k !== key );
+
+		while ( true ) {
+
+			try {
+
+				storage.setItem( key, text );
+				break;
+
+			} catch {
+
+				const victim = index.pop(); // oldest = last entry (MRU-first order)
+				if ( victim === undefined ) {
+
+					try { storage.setItem( INDEX_KEY, JSON.stringify( index ) ); } catch {}
+					return; // nothing left to evict; give up silently
+
+				}
+
+				try { storage.removeItem( victim ); } catch {}
+
+			}
+
+		}
+
+		index.unshift( key );
+		for ( const stray of strayGhostKeys( storage, index ) ) index.push( stray );
+
+		while ( index.length > MAX_STORED_GHOSTS ) {
+
+			const victim = index.pop();
+			try { storage.removeItem( victim ); } catch {}
+
+		}
+
+		try { storage.setItem( INDEX_KEY, JSON.stringify( index ) ); } catch {}
 
 	} catch {}
 
