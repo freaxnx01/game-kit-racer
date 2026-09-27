@@ -1,3 +1,17 @@
+// Keyboard axes from the held-key map ( KeyboardEvent.code → bool ). Space throttles like W (#16).
+export function keyboardAxes( keys ) {
+
+	let x = 0, z = 0;
+
+	if ( keys[ 'KeyA' ] || keys[ 'ArrowLeft' ] ) x -= 1;
+	if ( keys[ 'KeyD' ] || keys[ 'ArrowRight' ] ) x += 1;
+	if ( keys[ 'KeyW' ] || keys[ 'ArrowUp' ] || keys[ 'Space' ] ) z += 1;
+	if ( keys[ 'KeyS' ] || keys[ 'ArrowDown' ] ) z -= 1;
+
+	return { x, z };
+
+}
+
 export class Controls {
 
 	constructor() {
@@ -107,14 +121,9 @@ export class Controls {
 
 	update() {
 
-		let x = 0, z = 0;
-
 		// Keyboard
 
-		if ( this.keys[ 'KeyA' ] || this.keys[ 'ArrowLeft' ] ) x -= 1;
-		if ( this.keys[ 'KeyD' ] || this.keys[ 'ArrowRight' ] ) x += 1;
-		if ( this.keys[ 'KeyW' ] || this.keys[ 'ArrowUp' ] ) z += 1;
-		if ( this.keys[ 'KeyS' ] || this.keys[ 'ArrowDown' ] ) z -= 1;
+		let { x, z } = keyboardAxes( this.keys );
 
 		// Gamepad
 
