@@ -41,6 +41,11 @@ All notable changes to this project are documented here, following
   steering touch (on an iPhone even with the silent switch on) and come back
   after a phone call, a locked screen or switching apps. Opening the Tracks menu
   first no longer leaves the game silent.
+- vs CPU: the CPU trucks no longer stutter through corners, and bumping into one
+  nudges your truck instead of flinging it away.
+- vs CPU: you hear a crash when you and a CPU truck hit each other.
+- vs CPU: restart or quit a running race at any time — with the buttons under the
+  positions, from the **vs CPU** button, or with `Esc`.
 
 ## [0.1.0] - 2026-09-24
 
