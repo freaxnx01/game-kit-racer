@@ -66,16 +66,18 @@ export class CpuDriver {
 
 	}
 
-	// Pose for Opponents.push: position, yaw-only quaternion, velocity.
+	// Pose for Opponents.push: position, yaw-only quaternion, velocity. The lane offset follows the smoothed
+	// heading's right vector, not the current segment's normal, so a truck off the centre line does not jump
+	// sideways at every 15° arc vertex.
 	state() {
 
-		const { x, z } = samplePath( this.path, this.distance, this.lateral );
+		const centre = samplePath( this.path, this.distance, 0 );
 		const behind = samplePath( this.path, this.distance - HEADING_SPAN, 0 );
 		const ahead = samplePath( this.path, this.distance + HEADING_SPAN, 0 );
 		const heading = Math.atan2( ahead.x - behind.x, ahead.z - behind.z ); // smooth through the 15° arc steps
 		const fx = Math.sin( heading ), fz = Math.cos( heading );
 		return {
-			p: [ x, SPHERE_Y, z ],
+			p: [ centre.x + fz * this.lateral, SPHERE_Y, centre.z - fx * this.lateral ],
 			q: [ 0, Math.sin( heading / 2 ), 0, Math.cos( heading / 2 ) ],
 			v: [ fx * this.speed, 0, fz * this.speed ],
 		};

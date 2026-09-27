@@ -1,7 +1,7 @@
 // Run: node --test test/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPath } from '../js/race/TrackPath.js';
+import { buildPath, samplePath } from '../js/race/TrackPath.js';
 import { CpuDriver, DIFFICULTY } from '../js/race/CpuDriver.js';
 
 const CELL = 9.99 * 0.75;
@@ -70,6 +70,43 @@ test( 'state_onTheStraight_facesForwardWithYawOnlyQuaternion', () => {
 	assert.ok( Math.abs( p[ 0 ] - 0.5 * CELL ) < 1e-9 && p[ 1 ] === 0.5 && Math.abs( p[ 2 ] - ( 0.5 * CELL + 2 ) ) < 1e-9 );
 	assert.deepEqual( q, [ 0, 0, 0, 1 ] );
 	assert.deepEqual( v, [ 0, 0, 5 ] );
+
+} );
+
+test( 'state_laneOffsetThroughCorners_movesWithoutJumps', () => {
+
+	for ( const lateral of [ 1.65, - 1.65, 2.2, - 2.2 ] ) {
+
+		const d = new CpuDriver( { path: buildPath( DEFAULT_TRACK, CELL ), start: 0, lateral, difficulty: DIFFICULTY.medium } );
+		let prev = d.state().p, largest = 0;
+		for ( let s = 0.05; s < d.path.length; s += 0.05 ) {
+
+			d.distance = s;
+			const p = d.state().p;
+			largest = Math.max( largest, Math.hypot( p[ 0 ] - prev[ 0 ], p[ 2 ] - prev[ 2 ] ) );
+			prev = p;
+
+		}
+
+		// A 0.05 step along the line moves an outer-lane truck at most ~0.09; the old per-segment offset jumped 0.48–0.62.
+		assert.ok( largest <= 0.12, `lateral ${ lateral }: jumped ${ largest.toFixed( 3 ) }` );
+
+	}
+
+} );
+
+test( 'state_laneOffsetOnTheStraight_matchesSamplePath', () => {
+
+	const path = buildPath( DEFAULT_TRACK, CELL );
+	const d = new CpuDriver( { path, start: 0, lateral: 1.65, difficulty: DIFFICULTY.medium } );
+	for ( const s of [ - 3, 2 ] ) {
+
+		d.distance = s;
+		const { p } = d.state();
+		const expected = samplePath( path, s, 1.65 );
+		assert.ok( Math.abs( p[ 0 ] - expected.x ) < 1e-9 && Math.abs( p[ 2 ] - expected.z ) < 1e-9, `at ${ s }` );
+
+	}
 
 } );
 
