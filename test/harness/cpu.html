@@ -2,7 +2,30 @@
 <style>
 	body { margin: 0; height: 100vh; background: #3a7; }
 	.corner-link { position: absolute; background: #fff; padding: 9px 18px; border-radius: 999px; font: 13px sans-serif; }
+	#tracks-button { bottom: 12px; left: 12px; }
+	#mp-button { bottom: 12px; left: 100px; }
+	#tracks-menu, #mp-panel { position: absolute; bottom: 56px; left: 12px; width: 200px; height: 60px; background: #fff; }
+	#tracks-menu[hidden], #mp-panel[hidden] { display: none; }
 </style></head><body>
+<!-- Stand-ins for index.html's Tracks menu and Lobby.js's #mp-button/#mp-panel — just enough DOM
+	(ids, hidden attribute, the same document-click-closes-the-menu listener as index.html) to check
+	CpuPanel's panel-closing interplay with them (review #10 should-fix 3) without pulling in three.js
+	or a real MultiplayerRace/Lobby. -->
+<a id="tracks-button" class="corner-link" role="button">Tracks</a>
+<div id="tracks-menu" hidden></div>
+<a id="mp-button" class="corner-link" role="button">Multiplayer</a>
+<div id="mp-panel" hidden></div>
+<script>
+	const menu = document.getElementById( 'tracks-menu' );
+	const tracksButton = document.getElementById( 'tracks-button' );
+	const setTracksOpen = ( open ) => { menu.hidden = ! open; };
+	tracksButton.addEventListener( 'click', ( e ) => { e.stopPropagation(); setTracksOpen( menu.hidden ); } );
+	document.addEventListener( 'click', ( e ) => { if ( ! menu.contains( e.target ) ) setTracksOpen( false ); } );
+
+	const mpPanel = document.getElementById( 'mp-panel' );
+	const mpButton = document.getElementById( 'mp-button' );
+	mpButton.addEventListener( 'click', () => { mpPanel.hidden = ! mpPanel.hidden; } );
+</script>
 <script type="module">
 // Headless check of the vs-CPU flow with a fake game (no three.js, no physics): real CpuPanel UI and
 // real CpuRace on the default circuit; the clock runs 20× faster so a 1-lap race ends in seconds.

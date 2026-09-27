@@ -17,6 +17,7 @@ const STYLE = `
 		color: #1f2430; z-index: 21; box-sizing: border-box;
 	}
 	#cpu-panel[hidden], #cpu-positions[hidden], #cpu-countdown[hidden] { display: none; }
+	@media (max-width: 760px) { #cpu-panel { bottom: 100px; } }
 	#cpu-panel h2 { font-size: 15px; margin: 0 0 10px; }
 	#cpu-panel label { display: block; margin: 10px 0 4px; color: #4a5260; }
 	#cpu-panel select {
@@ -71,6 +72,7 @@ export class CpuPanel {
 		this.race = null;
 		this.isBusy = () => false;
 		this.open = false;
+		this.closingLobby = false;
 		this.view = { available: true, settings: { cpus: 3, difficulty: 'medium', laps: 3 }, phase: null, positions: [], results: null, countdown: null, laps: 3 };
 		this.structure = '';
 
@@ -78,7 +80,11 @@ export class CpuPanel {
 		style.textContent = STYLE;
 		document.head.appendChild( style );
 
-		this.button = el( 'a', { id: 'cpu-button', className: 'corner-link', role: 'button', on: { click: ( e ) => { e.stopPropagation(); this.toggle(); } } } );
+		// The click reaches document, so index.html closes its Tracks menu; opening Tracks or the
+		// multiplayer Lobby closes this panel (and, symmetrically, opening this panel closes the Lobby).
+		this.button = el( 'a', { id: 'cpu-button', className: 'corner-link', role: 'button', on: { click: () => this.toggle() } } );
+		document.getElementById( 'tracks-button' )?.addEventListener( 'click', () => this.close() );
+		document.getElementById( 'mp-button' )?.addEventListener( 'click', () => { if ( ! this.closingLobby ) this.close(); } );
 		this.panel = el( 'div', { id: 'cpu-panel', hidden: true } );
 		this.positionsList = el( 'div' );
 		this.quitButton = el( 'button', { on: { click: () => this.race?.quit() } } );
@@ -106,7 +112,28 @@ export class CpuPanel {
 	toggle() {
 
 		this.open = ! this.open;
+		if ( this.open ) this.closeMultiplayerLobby();
 		this.render( this.view, true );
+
+	}
+
+	close() {
+
+		if ( ! this.open ) return;
+		this.open = false;
+		this.render( this.view, true );
+
+	}
+
+	// Pre-#8 Lobby.js has no public close() to call, so close it the same way it closes the Tracks
+	// menu: dispatch a click on its own button, which only ever toggles it shut here since it's open.
+	closeMultiplayerLobby() {
+
+		const lobbyPanel = document.getElementById( 'mp-panel' );
+		if ( ! lobbyPanel || lobbyPanel.hidden ) return;
+		this.closingLobby = true;
+		document.getElementById( 'mp-button' )?.click();
+		this.closingLobby = false;
 
 	}
 
@@ -187,7 +214,7 @@ export class CpuPanel {
 		return [
 			el( 'h2', { text: t( 'mp.results', L ) } ), table,
 			el( 'button', { className: 'primary', text: t( 'mp.rematch', L ), on: { click: () => this.race.rematch() } } ),
-			el( 'button', { text: t( 'cpu.freeDrive', L ), on: { click: () => this.race.quit() } } ),
+			el( 'button', { text: t( 'cpu.freeDrive', L ), on: { click: () => { this.open = false; this.race.quit(); } } } ),
 		];
 
 	}
