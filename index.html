@@ -76,7 +76,7 @@
 		}
 	</script>
 	<script type="module">
-		import { PRESET_TRACKS } from './js/Tracks.js';
+		import { PRESET_TRACKS, trackHref } from './js/Tracks.js';
 
 		const current = new URLSearchParams( location.search ).get( 'map' );
 		const menu = document.getElementById( 'tracks-menu' );
@@ -85,7 +85,7 @@
 		for ( const t of PRESET_TRACKS ) {
 
 			const a = document.createElement( 'a' );
-			a.href = t.map ? 'index.html?map=' + t.map : 'index.html';
+			a.href = trackHref( t );
 			a.innerHTML = '<span></span><small></small>';
 			a.firstChild.textContent = t.name;
 			a.lastChild.textContent = t.desc;

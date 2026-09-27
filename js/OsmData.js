@@ -4,7 +4,7 @@
 // A link from osm-track.html carries &osm=<s>,<w>,<n>,<e>,<metresPerCell>,<offX>,<offZ>, the same
 // numbers OsmTrack.js used to build the ?map= tiles, so OSM metres land exactly on those tiles.
 
-import { makeProjection } from './OsmTrack.js';
+import { makeProjection, wayName } from './OsmTrack.js';
 
 const MAX_SPAN_DEG = 0.1;
 const MAX_OFFSET = 256;
@@ -103,9 +103,9 @@ export function osmFeatures( osm, param, cellSize ) {
 		const tags = el.tags ?? {};
 		const pts = el.nodes.map( ( id ) => nodes.get( id ) ).filter( Boolean );
 
-		if ( tags.highway && pts.length >= 2 ) {
+		if ( tags.highway && tags.area !== 'yes' && pts.length >= 2 ) {
 
-			streets.push( { id: el.id, name: tags.name ?? '', pts } );
+			streets.push( { id: el.id, name: wayName( tags ), pts } );
 
 		} else if ( tags.building && isClosedRing( el.nodes ) && pts.length === el.nodes.length ) {
 

@@ -11,6 +11,18 @@ import {
 const CELL = 9.99 * 0.75; // CELL_RAW * GRID_SCALE in Track.js
 const fixture = JSON.parse( fs.readFileSync( new URL( './fixtures/sisseln.json', import.meta.url ) ) );
 
+// Four nodes on a ~76 m × 111 m block; ways = [ [ id, nodeIds, tags ], … ]
+const MINI_BBOX = [ 46.999, 7.999, 47.002, 8.002 ];
+const miniOsm = ( ways ) => ( {
+	elements: [
+		{ type: 'node', id: 1, lat: 47.0, lon: 8.0 },
+		{ type: 'node', id: 2, lat: 47.0, lon: 8.001 },
+		{ type: 'node', id: 3, lat: 47.001, lon: 8.001 },
+		{ type: 'node', id: 4, lat: 47.001, lon: 8.0 },
+		...ways.map( ( [ id, nodes, tags ] ) => ( { type: 'way', id, nodes, tags } ) ),
+	],
+} );
+
 // A real 10 m/cell loop around the fixture centre, placed like osm-track.html places it.
 // loop is the real street route (the loop's OSM nodes) in world units.
 function sisselnTrack( mode = 'auto' ) {
@@ -194,5 +206,17 @@ test( 'StreetIndex_farFromAnyStreet_returnsNull', () => {
 	const index = new StreetIndex( [ { name: 'Only Road', pts: [ [ 0, 0 ], [ 10, 0 ] ] } ], CELL );
 	assert.equal( index.nameAt( 5, 3 * CELL ), null );
 	assert.equal( new StreetIndex( [], CELL ).nameAt( 0, 0 ), null );
+
+} );
+
+test( 'osmFeatures_areaSquareAndUnnamedBridge_skipsSquareAndNamesBridge', () => {
+
+	const osm = miniOsm( [
+		[ 10, [ 1, 2 ], { highway: 'pedestrian', bridge: 'covered', 'bridge:name': 'Holzbrücke Bad Säckingen' } ],
+		[ 11, [ 1, 2, 3, 4, 1 ], { highway: 'pedestrian', area: 'yes', name: 'Münsterplatz' } ],
+	] );
+	const { streets, buildings } = osmFeatures( osm, { bbox: MINI_BBOX, mpc: 10, offX: 0, offZ: 0 }, CELL );
+	assert.deepEqual( streets.map( ( s ) => [ s.id, s.name ] ), [ [ 10, 'Holzbrücke Bad Säckingen' ] ] );
+	assert.equal( buildings.length, 0 );
 
 } );

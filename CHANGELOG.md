@@ -20,6 +20,12 @@ All notable changes to this project are documented here, following
   paste back their answer code, and race a countdown start over 1–10 laps with
   trucks you can bump into. Works without any server; strict company networks
   may block it (a phone hotspot helps). Available in German and English.
+- New track "Bad Säckingen Altstadt" in the Tracks menu: start on the covered
+  wooden bridge over the Rhine, cross to Stein AG, come back over the
+  Fridolinsbrücke and race through the old-town lanes — with the real houses
+  and street names around you.
+- The OpenStreetMap track builder now also uses pedestrian zones, so old-town
+  lanes can be part of a track.
 
 ## [0.1.0] - 2026-09-24
 
