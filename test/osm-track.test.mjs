@@ -238,3 +238,54 @@ test( 'bakeLoop_fewerThanThreeWaypoints_throws', () => {
 	assert.throws( () => bakeLoop( osm, { bbox: MINI_BBOX, waypoints: [ [ 47.0, 8.0 ], [ 47.001, 8.001 ] ], mpc: 10 } ), /at least three/ );
 
 } );
+
+// A fetch that never answers until its signal aborts — like an overloaded Overpass mirror.
+const hangingFetch = ( url, { signal } ) => new Promise( ( resolve, reject ) => {
+
+	signal.addEventListener( 'abort', () => reject( new DOMException( 'aborted', 'AbortError' ) ) );
+
+} );
+
+test( 'fetchOverpass_onTry_receivesIndexAndCount', async () => {
+
+	const tried = [];
+	const fetchImpl = async ( url ) => url === OVERPASS_MIRRORS[ 0 ] ? { ok: false, status: 504 } : okResponse( { elements: [ 1 ] } );
+	await fetchOverpass( 'Q', { storage: memoryStorage(), fetchImpl, onTry: ( ...args ) => tried.push( args ) } );
+	const count = OVERPASS_MIRRORS.length;
+	assert.deepEqual( tried, [ [ new URL( OVERPASS_MIRRORS[ 0 ] ).host, 1, count ], [ new URL( OVERPASS_MIRRORS[ 1 ] ).host, 2, count ] ] );
+
+} );
+
+test( 'fetchOverpass_abortedDuringRequest_stopsWithoutTryingNextMirror', async () => {
+
+	const storage = memoryStorage();
+	const cancel = new AbortController();
+	const tried = [];
+	const onTry = ( host ) => {
+
+		tried.push( host );
+		setTimeout( () => cancel.abort(), 0 );
+
+	};
+	await assert.rejects( fetchOverpass( 'Q', { storage, fetchImpl: hangingFetch, signal: cancel.signal, onTry } ), { name: 'AbortError' } );
+	assert.equal( tried.length, 1 );
+	assert.equal( storage.size(), 0 );
+
+} );
+
+test( 'fetchOverpass_alreadyAborted_rejectsWithoutNetwork', async () => {
+
+	const cancel = new AbortController();
+	cancel.abort();
+	const fetchImpl = () => assert.fail( 'network used after cancel' );
+	await assert.rejects( fetchOverpass( 'Q', { storage: memoryStorage(), fetchImpl, signal: cancel.signal } ), { name: 'AbortError' } );
+
+} );
+
+test( 'fetchOverpass_mirrorTimesOut_triesNextMirror', async () => {
+
+	const fetchImpl = ( url, init ) => url === OVERPASS_MIRRORS[ 0 ] ? hangingFetch( url, init ) : okResponse( { elements: [ 1 ] } );
+	const { source } = await fetchOverpass( 'Q', { storage: memoryStorage(), fetchImpl, timeoutMs: 5 } );
+	assert.equal( source, new URL( OVERPASS_MIRRORS[ 1 ] ).host );
+
+} );
