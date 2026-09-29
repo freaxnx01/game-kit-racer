@@ -6,6 +6,8 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
 ### Added
 
 - Ghost: after your first full lap, a see-through truck replays your fastest
@@ -37,6 +39,7 @@ All notable changes to this project are documented here, following
   percent. **Cancel** takes you back to the track you came from; while the real
   houses of an OpenStreetMap track are still loading, it skips them and you drive
   on without. Available in German and English.
+- Fullscreen toggle (⛶) in the game navigation
 
 ### Changed
 
