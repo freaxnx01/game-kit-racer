@@ -1053,7 +1053,7 @@
 	function toggleDirt( gx, gz ) {
 
 		const cell = grid.get( cellKey( gx, gz ) );
-		if ( ! cell || cell.isFinish ) return; // the finish line stays visible
+		if ( ! cell || cell.isFinish || cell.type === 'track-bump' ) return; // finish and bumps stay clean
 		cell.dirt = ! cell.dirt;
 		placeMesh( gx, gz, cell );
 		save();

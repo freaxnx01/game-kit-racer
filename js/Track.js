@@ -385,7 +385,7 @@ function getDirtMaterial() {
 export function dirtOverlay( cell ) {
 
 	const [ gx, gz, type, orient ] = cell;
-	if ( ! isDirt( cell ) || type === 'track-finish' ) return null;
+	if ( ! isDirt( cell ) || type === 'track-finish' || type === 'track-bump' ) return null;
 
 	const shape = type === 'track-corner' ? 'corner' : 'straight';
 	if ( shape === 'straight' && ! isStraightLike( type ) ) return null;
