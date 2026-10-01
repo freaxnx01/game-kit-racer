@@ -5,7 +5,8 @@ const VERTS_PER_SEGMENT = 6;
 const FLOATS_PER_SEGMENT = VERTS_PER_SEGMENT * 3;
 const COLOR_FLOATS_PER_SEGMENT = VERTS_PER_SEGMENT * 4;
 
-const WIDTH = 0.08;
+const ASPHALT_WIDTH = 0.08;
+const DIRT_WIDTH = 0.14;
 const Y_OFFSET = 0.05;
 const MIN_SEGMENT_LENGTH = 0.02;
 const INTENSITY_MIN = 0.5;
@@ -28,7 +29,7 @@ const _replayCurr = new THREE.Vector3();
 
 class DriftTrail {
 
-	constructor( scene, material ) {
+	constructor( scene, material, width ) {
 
 		const positions = new Float32Array( MAX_SEGMENTS * FLOATS_PER_SEGMENT );
 		const colors = new Float32Array( MAX_SEGMENTS * COLOR_FLOATS_PER_SEGMENT );
@@ -63,6 +64,7 @@ class DriftTrail {
 		this.positions = positions;
 		this.colors = colors;
 		this.geometry = geometry;
+		this.width = width;
 		this.segmentIndex = 0;
 		this.drawCount = 0;
 		this.prev = new THREE.Vector3();
@@ -98,7 +100,7 @@ class DriftTrail {
 		if ( len < MIN_SEGMENT_LENGTH ) return;
 		_dir.divideScalar( len );
 
-		_side.set( _dir.z, 0, - _dir.x ).multiplyScalar( WIDTH );
+		_side.set( _dir.z, 0, - _dir.x ).multiplyScalar( this.width );
 
 		_pL.copy( prev ).add( _side );
 		_pR.copy( prev ).sub( _side );
@@ -252,9 +254,14 @@ export class DriftMarks {
 			polygonOffsetUnits: - 4,
 		} );
 
+		const dirtMaterial = material.clone();
+		dirtMaterial.color.set( 0x3a2a18 );
+
 		this.trails = [
-			new DriftTrail( scene, material ),
-			new DriftTrail( scene, material ),
+			new DriftTrail( scene, material, ASPHALT_WIDTH ),
+			new DriftTrail( scene, material, ASPHALT_WIDTH ),
+			new DriftTrail( scene, dirtMaterial, DIRT_WIDTH ),
+			new DriftTrail( scene, dirtMaterial, DIRT_WIDTH ),
 		];
 
 		this.storageKey = STORAGE_PREFIX + ( trackId || 'default' );
@@ -264,17 +271,23 @@ export class DriftMarks {
 
 	}
 
-	update( dt, vehicle ) {
+	update( dt, vehicle, surface = 'asphalt' ) {
 
-		const emit = vehicle.driftIntensity > 0.5 && Math.abs( vehicle.linearSpeed ) > 0.15;
-
-		if ( ! emit && ! this.trails[ 0 ].active && ! this.trails[ 1 ].active ) return;
-
+		const drifting = vehicle.driftIntensity > 0.5 && Math.abs( vehicle.linearSpeed ) > 0.15 && ! vehicle.airborne;
 		const groundY = vehicle.container.position.y + Y_OFFSET;
 		const intensity = vehicle.driftIntensity;
+		const onDirt = surface === 'dirt';
 
-		this.trails[ 0 ].track( vehicle.wheelBL, groundY, intensity, emit );
-		this.trails[ 1 ].track( vehicle.wheelBR, groundY, intensity, emit );
+		this.trackPair( 0, vehicle, groundY, intensity, drifting && ! onDirt );
+		this.trackPair( 2, vehicle, groundY, intensity, drifting && onDirt );
+
+	}
+
+	trackPair( first, vehicle, groundY, intensity, emit ) {
+
+		if ( ! emit && ! this.trails[ first ].active && ! this.trails[ first + 1 ].active ) return;
+		this.trails[ first ].track( vehicle.wheelBL, groundY, intensity, emit );
+		this.trails[ first + 1 ].track( vehicle.wheelBR, groundY, intensity, emit );
 
 	}
 

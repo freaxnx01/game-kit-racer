@@ -1,11 +1,41 @@
 import * as THREE from 'three';
+import { PIECES, profileOf, isStraightLike } from './Pieces.js';
+import { sliceAlongZ, liftByProfile, evenCuts, dirtPatch } from './ProfileGeometry.js';
+import { isDirt } from './TrackCodec.js';
+
+export { encodeCells, decodeCells, TYPE_NAMES } from './TrackCodec.js';
 
 export const ORIENT_DEG = { 0: 0, 10: 180, 16: 90, 22: 270 };
 
 export const CELL_RAW = 9.99;
 export const GRID_SCALE = 0.75;
 
+const PROFILE_STEPS = 40; // bands along a profile piece; 40 keeps the ramp lip (5% of the cell) sharp
+
 const _dummy = new THREE.Object3D();
+
+// Profile pieces (ramp, tabletop, whoops) are the straight piece sliced into bands along z and lifted by
+// their height profile — same kerbs, markings and walls, just not flat. Added to `models` like a GLB.
+export function addProfileModels( models ) {
+
+	const straight = models[ 'track-straight' ];
+	if ( ! straight?.isMesh ) throw new Error( 'track-straight must load as a single mesh' );
+
+	const flat = straight.geometry.toNonIndexed();
+	const sliced = sliceAlongZ( flat.attributes.position.array, flat.attributes.uv.array, evenCuts( CELL_RAW / 2, PROFILE_STEPS ) );
+
+	for ( const [ type, piece ] of Object.entries( PIECES ) ) {
+
+		if ( ! piece.profile ) continue;
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( liftByProfile( sliced.positions, profileOf( type ), CELL_RAW / 2 ), 3 ) );
+		geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( sliced.uvs, 2 ) );
+		geometry.computeVertexNormals();
+		models[ type ] = new THREE.Mesh( geometry, straight.material );
+
+	}
+
+}
 
 export const TRACK_CELLS = [
 	[ -3, -3, 'track-corner',   16 ],
@@ -127,10 +157,14 @@ export function buildTrack( scene, models, customCells, { grassArea = null } = {
 
 	const cells = customCells || TRACK_CELLS;
 
-	for ( const [ gx, gz, key, orient ] of cells ) {
+	for ( const cell of cells ) {
 
+		const [ gx, gz, key, orient ] = cell;
 		const piece = placePiece( models, key, gx, gz, orient );
 		if ( piece ) trackPieceGroup.add( piece );
+
+		const dirt = dirtOverlay( cell );
+		if ( dirt ) trackPieceGroup.add( dirt );
 
 	}
 
@@ -320,6 +354,55 @@ export function buildTrack( scene, models, customCells, { grassArea = null } = {
 
 }
 
+let dirtMaterial = null;
+
+// Brown, speckled, generated once on a canvas — no new asset.
+function getDirtMaterial() {
+
+	if ( dirtMaterial ) return dirtMaterial;
+	const canvas = document.createElement( 'canvas' );
+	canvas.width = canvas.height = 64;
+	const ctx = canvas.getContext( '2d' );
+	ctx.fillStyle = '#8a6a45';
+	ctx.fillRect( 0, 0, 64, 64 );
+	for ( let i = 0; i < 400; i ++ ) {
+
+		const shade = 90 + Math.floor( Math.random() * 70 );
+		ctx.fillStyle = `rgb(${ shade + 40 },${ shade + 15 },${ shade - 20 })`;
+		ctx.fillRect( Math.random() * 64, Math.random() * 64, 2, 2 );
+
+	}
+
+	const map = new THREE.CanvasTexture( canvas );
+	map.wrapS = map.wrapT = THREE.RepeatWrapping;
+	map.colorSpace = THREE.SRGBColorSpace;
+	dirtMaterial = new THREE.MeshStandardMaterial( { map, roughness: 1, polygonOffset: true, polygonOffsetFactor: - 1, polygonOffsetUnits: - 1 } );
+	return dirtMaterial;
+
+}
+
+// Dirt look for one cell: an overlay on the road, placed like the piece. Finish cells never get one.
+export function dirtOverlay( cell ) {
+
+	const [ gx, gz, type, orient ] = cell;
+	if ( ! isDirt( cell ) || type === 'track-finish' || type === 'track-bump' ) return null;
+
+	const shape = type === 'track-corner' ? 'corner' : 'straight';
+	if ( shape === 'straight' && ! isStraightLike( type ) ) return null;
+	const { positions, uvs } = dirtPatch( shape, profileOf( type ), 40 );
+	const geometry = new THREE.BufferGeometry();
+	geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+	geometry.computeVertexNormals();
+
+	const mesh = new THREE.Mesh( geometry, getDirtMaterial() );
+	mesh.position.set( ( gx + 0.5 ) * CELL_RAW, 0.5, ( gz + 0.5 ) * CELL_RAW );
+	mesh.rotation.y = THREE.MathUtils.degToRad( ORIENT_DEG[ orient ] ?? 0 );
+	mesh.receiveShadow = true;
+	return mesh;
+
+}
+
 export function placePiece( models, key, gx, gz, orient ) {
 
 	const src = models[ key ];
@@ -332,58 +415,6 @@ export function placePiece( models, key, gx, gz, orient ) {
 	piece.rotation.y = THREE.MathUtils.degToRad( deg );
 
 	return piece;
-
-}
-
-// ─── Track Codec ──────────────────────────────────────────
-
-const TYPE_NAMES = [ 'track-straight', 'track-corner', 'track-bump', 'track-finish' ];
-const TYPE_INDEX = {};
-for ( let i = 0; i < TYPE_NAMES.length; i ++ ) TYPE_INDEX[ TYPE_NAMES[ i ] ] = i;
-
-const ORIENT_TO_GODOT = [ 0, 16, 10, 22 ];
-const GODOT_TO_ORIENT = { 0: 0, 16: 1, 10: 2, 22: 3 };
-
-export { TYPE_NAMES };
-
-export function encodeCells( cells ) {
-
-	const bytes = new Uint8Array( cells.length * 3 );
-
-	for ( let i = 0; i < cells.length; i ++ ) {
-
-		const [ gx, gz, name, godotOrient ] = cells[ i ];
-		const ti = TYPE_INDEX[ name ] ?? 0;
-		const oi = GODOT_TO_ORIENT[ godotOrient ] ?? 0;
-
-		bytes[ i * 3 ] = gx + 128;
-		bytes[ i * 3 + 1 ] = gz + 128;
-		bytes[ i * 3 + 2 ] = ( ti << 2 ) | oi;
-
-	}
-
-	return bytesToBase64url( bytes );
-
-}
-
-export function decodeCells( str ) {
-
-	const bytes = base64urlToBytes( str );
-	const cells = [];
-
-	for ( let i = 0; i + 2 < bytes.length; i += 3 ) {
-
-		const gx = bytes[ i ] - 128;
-		const gz = bytes[ i + 1 ] - 128;
-		const packed = bytes[ i + 2 ];
-		const ti = ( packed >> 2 ) & 0x03;
-		const oi = packed & 0x03;
-
-		cells.push( [ gx, gz, TYPE_NAMES[ ti ], ORIENT_TO_GODOT[ oi ] ] );
-
-	}
-
-	return cells;
 
 }
 
@@ -439,25 +470,5 @@ export function computeTrackBounds( cells ) {
 	const halfDepth = ( maxZ - minZ + 1 ) / 2 * S + S;
 
 	return { centerX, centerZ, halfWidth, halfDepth };
-
-}
-
-function bytesToBase64url( bytes ) {
-
-	let binary = '';
-	for ( let i = 0; i < bytes.length; i ++ ) binary += String.fromCharCode( bytes[ i ] );
-
-	return btoa( binary ).replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=+$/, '' );
-
-}
-
-function base64urlToBytes( str ) {
-
-	const base64 = str.replace( /-/g, '+' ).replace( /_/g, '/' );
-	const binary = atob( base64 );
-	const bytes = new Uint8Array( binary.length );
-	for ( let i = 0; i < binary.length; i ++ ) bytes[ i ] = binary.charCodeAt( i );
-
-	return bytes;
 
 }

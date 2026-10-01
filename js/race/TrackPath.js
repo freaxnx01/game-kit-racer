@@ -2,17 +2,10 @@
 // direction and turns them into a closed polyline CPU drivers follow. Pure (no three.js, no DOM).
 // Cells are [ gx, gz, type, godotOrient ] as in Track.js; world x/z of a cell centre = ( g + 0.5 ) * cellSize.
 
+import { PIECES } from '../Pieces.js';
+
 const ORIENT_DEG = { 0: 0, 10: 180, 16: 90, 22: 270 }; // same table as Track.js
 const ARC_STEPS = 6; // corner arcs are drawn with 6 segments of 15°
-
-// Open sides of a piece at orientation 0, as grid steps [ dx, dz ]. Straight, bump and finish run along z;
-// a corner joins -x and +z (checked against the default track in Track.js).
-const OPEN_SIDES = {
-	'track-straight': [ [ 0, 1 ], [ 0, - 1 ] ],
-	'track-bump': [ [ 0, 1 ], [ 0, - 1 ] ],
-	'track-finish': [ [ 0, 1 ], [ 0, - 1 ] ],
-	'track-corner': [ [ - 1, 0 ], [ 0, 1 ] ],
-};
 
 // Rotates a grid step like three.js rotation.y does: +z turns towards +x for positive angles.
 function rotateStep( [ dx, dz ], deg ) {
@@ -25,7 +18,7 @@ function rotateStep( [ dx, dz ], deg ) {
 // The two grid steps through which a piece connects to its neighbours.
 export function openSides( type, orient ) {
 
-	const sides = OPEN_SIDES[ type ];
+	const sides = PIECES[ type ]?.open;
 	if ( ! sides ) return null;
 	return sides.map( ( s ) => rotateStep( s, ORIENT_DEG[ orient ] ?? 0 ) );
 

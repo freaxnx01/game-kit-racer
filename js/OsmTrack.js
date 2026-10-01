@@ -7,7 +7,9 @@
 //   raster → straight / corner / finish pieces with Godot orientation codes
 //
 // World mapping: +X = east, +Z = south (gz = -north). One grid cell = `metersPerCell` metres.
-// Grid coordinates must stay within -128..127 because of the 1-byte cell codec in Track.js.
+// Grid coordinates must stay within -128..127 because of the 1-byte cell codec in TrackCodec.js.
+
+import { encodeCells } from './TrackCodec.js';
 
 export const DEFAULT_HIGHWAYS = 'primary|secondary|tertiary|unclassified|residential|living_street|service|track|pedestrian';
 
@@ -680,26 +682,10 @@ export function bakeLoop( osm, { bbox, waypoints, mpc, mode = 'auto', tol = mpc 
 
 }
 
-// ── Codec (mirrors Track.js exactly, so this module has no three.js dependency) ──
-const TYPE_INDEX = { 'track-straight': 0, 'track-corner': 1, 'track-bump': 2, 'track-finish': 3 };
-const GODOT_TO_ORIENT = { 0: 0, 16: 1, 10: 2, 22: 3 };
-
+// ── Codec: the shared TrackCodec (pure, no three.js) ──
 export function encodeTrackCells( cells ) {
 
-	const bytes = new Uint8Array( cells.length * 3 );
-
-	for ( let i = 0; i < cells.length; i ++ ) {
-
-		const [ gx, gz, name, godotOrient ] = cells[ i ];
-		bytes[ i * 3 ] = gx + 128;
-		bytes[ i * 3 + 1 ] = gz + 128;
-		bytes[ i * 3 + 2 ] = ( ( TYPE_INDEX[ name ] ?? 0 ) << 2 ) | ( GODOT_TO_ORIENT[ godotOrient ] ?? 0 );
-
-	}
-
-	let binary = '';
-	for ( let i = 0; i < bytes.length; i ++ ) binary += String.fromCharCode( bytes[ i ] );
-	return btoa( binary ).replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=+$/, '' );
+	return encodeCells( cells );
 
 }
 

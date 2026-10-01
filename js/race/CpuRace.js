@@ -171,7 +171,7 @@ export class CpuRace {
 		const name = FUNNY_NAMES[ index ];
 		const { start, lateral } = laneOf( slot, this.finishCell, this.game.cellSize );
 		this.race.addPlayer( id, name );
-		this.drivers.set( id, new CpuDriver( { path: this.path, start, lateral, difficulty, pace: PACE[ index ] } ) );
+		this.drivers.set( id, new CpuDriver( { path: this.path, start, lateral, difficulty, pace: PACE[ index ], terrain: this.game.terrain ?? null } ) );
 		this.game.opponents.add( id, name, index );
 
 	}

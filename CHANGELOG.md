@@ -6,6 +6,21 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Added
+
+- New track pieces: **ramp**, **tabletop** and **whoops** — with real jumps. Hit
+  the ramp at speed and the truck flies; the whoops shake it about.
+- Any piece can now be **dirt**: less grip, more sliding, lower top speed, brown
+  dust and dirt tracks behind you.
+- The editor has two new tools: **Element** (4) turns a straight into a ramp,
+  tabletop or whoops — Shift+click flips its direction — and **Dirt** (5)
+  paints dirt onto the road.
+
+### Changed
+
+- **The Claypit** is now a real dirt rallycross track with a ramp, a tabletop
+  and whoops.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added

@@ -4,6 +4,7 @@ import { AudioUnlock } from './AudioUnlock.js';
 // RPM range is owned by the engine synth; import it so the 0..1 gear model
 // here and the worklet's normalization can't drift apart.
 import { RPM_IDLE, RPM_MAX } from './EngineWorklet.js';
+import { skidShape } from './SurfaceFx.js';
 
 function remap( value, inMin, inMax, outMin, outMax ) {
 
@@ -281,7 +282,7 @@ export class GameAudio {
 
 	}
 
-	update( dt, speed, throttle, driftIntensity ) {
+	update( dt, speed, throttle, driftIntensity, surface = 'asphalt' ) {
 
 		const absSpeed = THREE.MathUtils.clamp( Math.abs( speed ), 0, 1 );
 		// Only forward throttle counts as engine load. Brake/reverse (throttle < 0)
@@ -351,6 +352,7 @@ export class GameAudio {
 
 		if ( this.skidSound.buffer ) {
 
+			const shape = skidShape( surface );
 			const shouldSkid = driftIntensity > 0.5;
 			let skidVol = 0;
 
@@ -363,9 +365,9 @@ export class GameAudio {
 
 			}
 
-			this.skidSound.gain.gain.setTargetAtTime( skidVol, now, 0.05 );
+			this.skidSound.gain.gain.setTargetAtTime( skidVol * shape.volume, now, 0.05 );
 
-			const skidPitch = THREE.MathUtils.clamp( Math.abs( speed ), 1, 3 );
+			const skidPitch = THREE.MathUtils.clamp( Math.abs( speed ), 1, 3 ) * shape.pitch;
 			const curPitch = this.skidSound.getPlaybackRate();
 			this.skidSound.setPlaybackRate( THREE.MathUtils.lerp( curPitch, skidPitch, 0.1 ) );
 
@@ -374,7 +376,7 @@ export class GameAudio {
 			const intensity01 = THREE.MathUtils.clamp(
 				remap( driftIntensity, 0.5, 1.6, 0, 1 ), 0, 1
 			);
-			this.skidTone.frequency.setTargetAtTime( 2500 + intensity01 * 7500, now, 0.1 );
+			this.skidTone.frequency.setTargetAtTime( ( 2500 + intensity01 * 7500 ) * shape.tone, now, 0.1 );
 
 		}
 

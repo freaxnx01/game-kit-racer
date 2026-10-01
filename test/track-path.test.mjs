@@ -3,20 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESET_TRACKS } from '../js/Tracks.js';
 import { openSides, trackOrder, buildPath, samplePath } from '../js/race/TrackPath.js';
+import { decodeCells as decode } from '../js/TrackCodec.js';
 
 const CELL = 9.99 * 0.75;
-const TYPE_NAMES = [ 'track-straight', 'track-corner', 'track-bump', 'track-finish' ];
-const ORIENT_TO_GODOT = [ 0, 16, 10, 22 ];
-
-// Same byte layout as decodeCells in js/Track.js (which needs three.js, so not imported here)
-function decode( str ) {
-
-	const bytes = Buffer.from( str.replace( /-/g, '+' ).replace( /_/g, '/' ), 'base64' );
-	const cells = [];
-	for ( let i = 0; i + 2 < bytes.length; i += 3 ) cells.push( [ bytes[ i ] - 128, bytes[ i + 1 ] - 128, TYPE_NAMES[ bytes[ i + 2 ] >> 2 ], ORIENT_TO_GODOT[ bytes[ i + 2 ] & 3 ] ] );
-	return cells;
-
-}
 
 // TRACK_CELLS from js/Track.js (the default circuit), copied because Track.js imports three.js.
 const DEFAULT_TRACK = [

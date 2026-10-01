@@ -1,8 +1,42 @@
 import * as THREE from 'three';
-import { rigidBody, box, sphere, MotionType, MotionQuality } from 'crashcat';
+import { rigidBody, box, sphere, triangleMesh, MotionType, MotionQuality } from 'crashcat';
 import { TRACK_CELLS, CELL_RAW, ORIENT_DEG, GRID_SCALE } from './Track.js';
+import { profileOf, profileMax, isStraightLike } from './Pieces.js';
+import { colliderGrid } from './ProfileGeometry.js';
 
 const _debugMat = new THREE.MeshBasicMaterial( { color: 0x00ff00, wireframe: true } );
+
+const COLLIDER_STEPS = 40;
+const ROAD_HALF_WIDTH = 4.75; // raw; the wall line (WALL_X)
+
+// Static triangle mesh of a profile piece's road, in world space (cell centre, orientation, grid scale,
+// floor at y = -0.125 like the rendered piece).
+function addProfileCollider( world, cell, S ) {
+
+	const [ gx, gz, type, orient ] = cell;
+	const { positions, indices } = colliderGrid( profileOf( type ), ROAD_HALF_WIDTH, CELL_RAW / 2, COLLIDER_STEPS );
+	const rad = ( ORIENT_DEG[ orient ] ?? 0 ) * Math.PI / 180;
+	const cr = Math.cos( rad ), sr = Math.sin( rad );
+	const cx = ( gx + 0.5 ) * CELL_RAW * S, cz = ( gz + 0.5 ) * CELL_RAW * S;
+	const worldPositions = [];
+
+	for ( let i = 0; i < positions.length; i += 3 ) {
+
+		const lx = positions[ i ], ly = positions[ i + 1 ], lz = positions[ i + 2 ];
+		worldPositions.push( cx + ( lx * cr + lz * sr ) * S, - 0.125 + ly * S, cz + ( - lx * sr + lz * cr ) * S );
+
+	}
+
+	rigidBody.create( world, {
+		shape: triangleMesh.create( { positions: worldPositions, indices } ),
+		motionType: MotionType.STATIC,
+		objectLayer: world._OL_STATIC,
+		position: [ 0, 0, 0 ],
+		friction: 5.0,
+		restitution: 0.0,
+	} );
+
+}
 
 function addDebugBox( group, halfExtents, position, quaternion ) {
 
@@ -69,7 +103,9 @@ export function buildWallColliders( world, debugGroup, customCells ) {
 
 	const cells = customCells || TRACK_CELLS;
 
-	for ( const [ gx, gz, key, orient ] of cells ) {
+	for ( const cell of cells ) {
+
+		const [ gx, gz, key, orient ] = cell;
 
 		if ( key === 'track-bump' ) continue;
 
@@ -80,15 +116,18 @@ export function buildWallColliders( world, debugGroup, customCells ) {
 		const rad = deg * Math.PI / 180;
 		const cr = Math.cos( rad ), sr = Math.sin( rad );
 
-		if ( key === 'track-straight' || key === 'track-finish' ) {
+		if ( key !== 'track-corner' && isStraightLike( key ) ) {
+
+			const lift = profileMax( key ) * S;
+			if ( lift > 0 ) addProfileCollider( world, cell, S );
 
 			for ( const side of [ - 1, 1 ] ) {
 
 				const lx = side * WALL_X;
 				const wx = cx + ( lx * cr ) * S;
 				const wz = cz + ( - lx * sr ) * S;
-				const halfExtents = [ hThick, hHeight, hLen ];
-				const position = [ wx, wallY, wz ];
+				const halfExtents = [ hThick, hHeight + lift / 2, hLen ];
+				const position = [ wx, wallY + lift / 2, wz ];
 				const quaternion = [ 0, Math.sin( rad / 2 ), 0, Math.cos( rad / 2 ) ];
 
 				rigidBody.create( world, {
