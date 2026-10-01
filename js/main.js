@@ -13,6 +13,7 @@ import { pieceModelNames } from './Pieces.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { smokeEmits, dustEmits } from './SurfaceFx.js';
+import { isWallImpact } from './ContactFx.js';
 import { DriftMarks } from './DriftMarks.js';
 import { GameAudio } from './Audio.js';
 import { LapTimer } from './LapTimer.js';
@@ -461,6 +462,11 @@ async function init() {
 				return;
 
 			}
+
+			// Profile pieces (ramp/tabletop/whoops) are separate static bodies, so driving onto/off
+			// them starts new contacts with a mostly-vertical normal — not a wall hit. Landings are
+			// handled by Airtime.
+			if ( ! isWallImpact( manifold.worldSpaceNormal[ 1 ] ) ) return;
 
 			_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
 			_forward.y = 0;
