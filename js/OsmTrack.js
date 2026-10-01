@@ -7,7 +7,7 @@
 //   raster → straight / corner / finish pieces with Godot orientation codes
 //
 // World mapping: +X = east, +Z = south (gz = -north). One grid cell = `metersPerCell` metres.
-// Grid coordinates must stay within -128..127 because of the 1-byte cell codec in Track.js.
+// Grid coordinates must stay within -128..127 because of the 1-byte cell codec in TrackCodec.js.
 
 import { encodeCells } from './TrackCodec.js';
 
