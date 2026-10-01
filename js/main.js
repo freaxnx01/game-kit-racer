@@ -440,6 +440,9 @@ async function init() {
 	multiplayer.join = ( ...args ) => { cpuRace.quit(); return joinSession( ...args ); };
 	cpuPanel.bind( cpuRace, { isBusy: () => !! multiplayer.view().role } );
 	lobby.bind( multiplayer );
+
+	// Playwright checks (&debug only): the running CPU race, never used by the game itself.
+	if ( window.__racerDebug ) window.__racerDebug.cpuRace = cpuRace;
 	const invite = parseInviteHash( window.location.hash );
 	if ( invite ) lobby.openJoin( invite );
 
