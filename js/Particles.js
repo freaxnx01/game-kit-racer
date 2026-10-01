@@ -12,7 +12,7 @@ const _brPos = new THREE.Vector3();
 
 export class SmokeTrails {
 
-	constructor( scene ) {
+	constructor( scene, { color = 0x5E5F6B } = {} ) {
 
 		const positions = new Float32Array( POOL_SIZE * 3 );
 		const opacities = new Float32Array( POOL_SIZE );
@@ -36,7 +36,7 @@ export class SmokeTrails {
 
 		const material = new THREE.PointsMaterial( {
 			map,
-			color: 0x5E5F6B,
+			color,
 			size: 1,
 			sizeAttenuation: true,
 			transparent: true,
@@ -92,12 +92,11 @@ export class SmokeTrails {
 
 	}
 
-	update( dt, vehicle ) {
+	update( dt, vehicle, emit ) {
 
-		const shouldEmit = vehicle.driftIntensity > 0.7;
 		let aliveCount = 0;
 
-		if ( shouldEmit ) {
+		if ( emit ) {
 
 			const roadY = vehicle.container.position.y + 0.05;
 			const bl = vehicle.wheelBL ? vehicle.wheelBL.getWorldPosition( _blPos ) : null;
@@ -145,7 +144,7 @@ export class SmokeTrails {
 
 		}
 
-		if ( shouldEmit || aliveCount > 0 ) {
+		if ( emit || aliveCount > 0 ) {
 
 			this.posAttr.needsUpdate = true;
 			this.opacityAttr.needsUpdate = true;

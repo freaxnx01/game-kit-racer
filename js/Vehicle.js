@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { rigidBody } from 'crashcat';
 import { isAirborne, landingSpeed, airPitch } from './Airtime.js';
+import { GRIP, SPEED_FACTOR } from './SurfaceFx.js';
 
 const _tmpVec = new THREE.Vector3();
 const _forward = new THREE.Vector3();
@@ -58,6 +59,7 @@ export class Vehicle {
 		this.terrain = null;     // makeTerrain() result, set by main.js; null = flat everywhere
 		this.airborne = false;
 		this.landing = 0;        // vertical speed of a landing this frame, 0 otherwise
+		this.surface = 'asphalt';
 
 	}
 
@@ -104,6 +106,10 @@ export class Vehicle {
 
 	update( dt, controlsInput ) {
 
+		this.surface = this.terrain ? this.terrain.surfaceAt( this.spherePos.x, this.spherePos.z ) : 'asphalt';
+		if ( this.rigidBody ) this.rigidBody.friction = GRIP[ this.surface ];
+		const topSpeed = MAX_SPEED * SPEED_FACTOR[ this.surface ];
+
 		this.inputX = controlsInput.x;
 		this.inputZ = controlsInput.z;
 
@@ -118,7 +124,7 @@ export class Vehicle {
 			const cross = _forward.x * this.inputZ - _forward.z * this.inputX;
 			this.inputX = THREE.MathUtils.clamp( - cross * 2, - 1, 1 );
 
-			this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, MAX_SPEED, dt * 1.5 );
+			this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, topSpeed, dt * 1.5 );
 
 		} else {
 
@@ -145,7 +151,7 @@ export class Vehicle {
 
 			} else {
 
-				this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, targetSpeed * MAX_SPEED, dt * 1.5 );
+				this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, targetSpeed * topSpeed, dt * 1.5 );
 
 			}
 

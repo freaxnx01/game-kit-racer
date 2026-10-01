@@ -1,7 +1,7 @@
 // Run: node --test test/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sliceAlongZ, liftByProfile, colliderGrid, evenCuts } from '../js/ProfileGeometry.js';
+import { sliceAlongZ, liftByProfile, colliderGrid, evenCuts, dirtPatch } from '../js/ProfileGeometry.js';
 
 const triangles = ( pos ) => pos.length / 9;
 const area = ( pos ) => {
@@ -79,6 +79,37 @@ test( 'colliderGrid_followsTheProfileAndFacesUp', () => {
 		const ux = b[ 0 ] - a[ 0 ], uy = b[ 1 ] - a[ 1 ], uz = b[ 2 ] - a[ 2 ];
 		const vx = c[ 0 ] - a[ 0 ], vy = c[ 1 ] - a[ 1 ], vz = c[ 2 ] - a[ 2 ];
 		assert.ok( uz * vx - ux * vz > 0, 'triangle must face up' ); // y of u × v
+
+	}
+
+} );
+
+test( 'dirtPatch_straight_coversTheRoadJustAboveIt', () => {
+
+	const { positions, uvs } = dirtPatch( 'straight', null, 4 );
+	assert.equal( uvs.length / 2, positions.length / 3 );
+	const xs = [], ys = [];
+	for ( let i = 0; i < positions.length; i += 3 ) { xs.push( positions[ i ] ); ys.push( positions[ i + 1 ] ); }
+	assert.equal( Math.min( ...xs ), - 4.5 );
+	assert.equal( Math.max( ...xs ), 4.5 );
+	assert.ok( ys.every( ( y ) => Math.abs( y - 0.02 ) < 1e-9 ) );
+
+} );
+
+test( 'dirtPatch_withProfile_followsIt', () => {
+
+	const { positions } = dirtPatch( 'straight', ( t ) => t, 4 );
+	for ( let i = 0; i < positions.length; i += 3 ) assert.ok( Math.abs( positions[ i + 1 ] - ( 0.02 + positions[ i + 2 ] / 9.99 + 0.5 ) ) < 1e-6 );
+
+} );
+
+test( 'dirtPatch_corner_isAQuarterRingAroundTheArcCentre', () => {
+
+	const { positions } = dirtPatch( 'corner', null, 8 );
+	for ( let i = 0; i < positions.length; i += 3 ) {
+
+		const r = Math.hypot( positions[ i ] + 4.995, positions[ i + 2 ] - 4.995 );
+		assert.ok( r > 0.49 && r < 9.51, `r = ${ r }` );
 
 	}
 

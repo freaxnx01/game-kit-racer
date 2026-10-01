@@ -12,6 +12,7 @@ import { makeTerrain } from './Terrain.js';
 import { pieceModelNames } from './Pieces.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
+import { smokeEmits, dustEmits } from './SurfaceFx.js';
 import { DriftMarks } from './DriftMarks.js';
 import { GameAudio } from './Audio.js';
 import { LapTimer } from './LapTimer.js';
@@ -189,6 +190,8 @@ function finishLoading() {
 
 }
 
+const LANDING_FX_SPEED = 2; // u/s: landings softer than this (whoops wobble) make no sound or dust
+
 async function init() {
 
 	registerAll();
@@ -318,6 +321,7 @@ async function init() {
 	const controls = new Controls();
 
 	const particles = new SmokeTrails( scene );
+	const dust = new SmokeTrails( scene, { color: 0x9a7a55 } );
 	const driftMarks = new DriftMarks( scene, mapParam );
 
 	const audio = new GameAudio();
@@ -489,7 +493,7 @@ async function init() {
 
 		vehicle.update( dt, input );
 
-		if ( vehicle.landing > 2 ) audio.playImpact( vehicle.landing );
+		if ( vehicle.landing > LANDING_FX_SPEED ) audio.playImpact( vehicle.landing );
 
 		dirLight.position.set(
 			vehicle.spherePos.x + 11.4,
@@ -502,9 +506,11 @@ async function init() {
 		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
 		spinHold.update( dt, Math.atan2( _forward.x, _forward.z ) );
 		cam.update( dt, vehicle.spherePos, _camLead, spinHold.hold );
-		particles.update( dt, vehicle );
-		driftMarks.update( dt, vehicle );
-		audio.update( dt, vehicle.linearSpeed / MAX_SPEED, input.z, vehicle.driftIntensity );
+		const speed01 = Math.abs( vehicle.linearSpeed ) / MAX_SPEED;
+		particles.update( dt, vehicle, smokeEmits( vehicle.surface, vehicle.driftIntensity ) );
+		dust.update( dt, vehicle, ( dustEmits( vehicle.surface, vehicle.driftIntensity, speed01 ) && ! vehicle.airborne ) || vehicle.landing > LANDING_FX_SPEED );
+		driftMarks.update( dt, vehicle, vehicle.surface );
+		audio.update( dt, vehicle.linearSpeed / MAX_SPEED, input.z, vehicle.driftIntensity, vehicle.surface );
 
 		const hasInput = input.touchActive || Math.abs( input.x ) > 0.05 || Math.abs( input.z ) > 0.05;
 		lapTimer.update( dt, vehicle.spherePos, hasInput );

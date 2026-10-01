@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { PIECES, profileOf } from './Pieces.js';
-import { sliceAlongZ, liftByProfile, evenCuts } from './ProfileGeometry.js';
+import { PIECES, profileOf, isStraightLike } from './Pieces.js';
+import { sliceAlongZ, liftByProfile, evenCuts, dirtPatch } from './ProfileGeometry.js';
+import { isDirt } from './TrackCodec.js';
 
 export { encodeCells, decodeCells, TYPE_NAMES } from './TrackCodec.js';
 
@@ -156,10 +157,14 @@ export function buildTrack( scene, models, customCells, { grassArea = null } = {
 
 	const cells = customCells || TRACK_CELLS;
 
-	for ( const [ gx, gz, key, orient ] of cells ) {
+	for ( const cell of cells ) {
 
+		const [ gx, gz, key, orient ] = cell;
 		const piece = placePiece( models, key, gx, gz, orient );
 		if ( piece ) trackPieceGroup.add( piece );
+
+		const dirt = dirtOverlay( cell );
+		if ( dirt ) trackPieceGroup.add( dirt );
 
 	}
 
@@ -346,6 +351,55 @@ export function buildTrack( scene, models, customCells, { grassArea = null } = {
 		}
 
 	}
+
+}
+
+let dirtMaterial = null;
+
+// Brown, speckled, generated once on a canvas — no new asset.
+function getDirtMaterial() {
+
+	if ( dirtMaterial ) return dirtMaterial;
+	const canvas = document.createElement( 'canvas' );
+	canvas.width = canvas.height = 64;
+	const ctx = canvas.getContext( '2d' );
+	ctx.fillStyle = '#8a6a45';
+	ctx.fillRect( 0, 0, 64, 64 );
+	for ( let i = 0; i < 400; i ++ ) {
+
+		const shade = 90 + Math.floor( Math.random() * 70 );
+		ctx.fillStyle = `rgb(${ shade + 40 },${ shade + 15 },${ shade - 20 })`;
+		ctx.fillRect( Math.random() * 64, Math.random() * 64, 2, 2 );
+
+	}
+
+	const map = new THREE.CanvasTexture( canvas );
+	map.wrapS = map.wrapT = THREE.RepeatWrapping;
+	map.colorSpace = THREE.SRGBColorSpace;
+	dirtMaterial = new THREE.MeshStandardMaterial( { map, roughness: 1, polygonOffset: true, polygonOffsetFactor: - 1, polygonOffsetUnits: - 1 } );
+	return dirtMaterial;
+
+}
+
+// Dirt look for one cell: an overlay on the road, placed like the piece. Finish cells never get one.
+export function dirtOverlay( cell ) {
+
+	const [ gx, gz, type, orient ] = cell;
+	if ( ! isDirt( cell ) || type === 'track-finish' ) return null;
+
+	const shape = type === 'track-corner' ? 'corner' : 'straight';
+	if ( shape === 'straight' && ! isStraightLike( type ) ) return null;
+	const { positions, uvs } = dirtPatch( shape, profileOf( type ), 40 );
+	const geometry = new THREE.BufferGeometry();
+	geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+	geometry.computeVertexNormals();
+
+	const mesh = new THREE.Mesh( geometry, getDirtMaterial() );
+	mesh.position.set( ( gx + 0.5 ) * CELL_RAW, 0.5, ( gz + 0.5 ) * CELL_RAW );
+	mesh.rotation.y = THREE.MathUtils.degToRad( ORIENT_DEG[ orient ] ?? 0 );
+	mesh.receiveShadow = true;
+	return mesh;
 
 }
 

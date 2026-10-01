@@ -125,3 +125,47 @@ export function colliderGrid( profile, halfWidth, halfLength, steps ) {
 	return { positions, indices };
 
 }
+
+const PATCH_Y = 0.02;          // raw units above the road, under the drift marks
+const ROAD_HALF = 4.5;         // raw half-width of the asphalt on a straight (kerbs start outside)
+const CELL_HALF = 4.995;
+const RING_INNER = 0.5, RING_OUTER = 9.5; // corner asphalt around the arc centre ( -CELL_HALF, +CELL_HALF )
+
+// Brown overlay for a dirt cell, as a triangle soup in the piece's local raw units. 'straight' covers
+// every straight-like piece (lifted by its profile, if any); 'corner' is the quarter ring of a corner.
+export function dirtPatch( shape, profile, steps ) {
+
+	const quad = shape === 'corner' ? cornerQuad : straightQuad;
+	const out = { positions: [], uvs: [] };
+
+	for ( let i = 0; i < steps; i ++ ) {
+
+		const a = quad( i / steps, 0, profile ), b = quad( i / steps, 1, profile );
+		const c = quad( ( i + 1 ) / steps, 0, profile ), d = quad( ( i + 1 ) / steps, 1, profile );
+		for ( const v of [ a, c, b, b, c, d ] ) {
+
+			out.positions.push( v[ 0 ], v[ 1 ], v[ 2 ] );
+			out.uvs.push( v[ 0 ] / 4, v[ 2 ] / 4 );
+
+		}
+
+	}
+
+	return out;
+
+}
+
+function straightQuad( t, side, profile ) {
+
+	return [ side ? ROAD_HALF : - ROAD_HALF, PATCH_Y + ( profile ? profile( t ) : 0 ), - CELL_HALF + 2 * CELL_HALF * t ];
+
+}
+
+// Quarter ring around the arc centre ( -CELL_HALF, +CELL_HALF ): from the +z edge (angle 0) to the
+// -x edge (angle -90°), like Physics.js's arc walls.
+function cornerQuad( t, side, profile ) {
+
+	const angle = - t * Math.PI / 2, r = side ? RING_OUTER : RING_INNER;
+	return [ - CELL_HALF + r * Math.cos( angle ), PATCH_Y, CELL_HALF + r * Math.sin( angle ) ];
+
+}
