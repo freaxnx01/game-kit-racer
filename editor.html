@@ -1001,6 +1001,7 @@
 	let lastDrawCell = null;
 	let spaceDown = false;
 	let shiftDown = false;
+	let elementDone = false; // the Element tool cycles at most once per press, even while dragging
 
 	// Track active pointers for multi-touch (pinch/pan)
 	const pointers = new Map();
@@ -1037,6 +1038,8 @@
 
 		} else if ( isDrawing && tool === 'element' ) {
 
+			if ( elementDone ) return;
+			elementDone = true;
 			cycleElement( cell.gx, cell.gz, shiftDown );
 
 		} else if ( isDrawing ) {
@@ -1151,12 +1154,10 @@
 
 			lastDrawCell = null;
 			shiftDown = e.shiftKey;
+			elementDone = false;
 
 			// On touch, defer draw until pointermove confirms single-finger gesture
 			if ( e.pointerType !== 'touch' ) handleDraw( e.clientX, e.clientY );
-
-			// Element cycles once per click; dragging must not re-cycle every cell passed over.
-			if ( tool === 'element' ) isDrawing = false;
 
 		} else if ( e.button === 2 ) {
 
