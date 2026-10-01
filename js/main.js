@@ -389,6 +389,7 @@ async function init() {
 		osmParam: osmRaw && /^[-0-9.,]{13,120}$/.test( osmRaw ) ? osmRaw : null,
 		lapTimer,
 		opponents: new Opponents( scene, world, models ),
+		terrain,
 		placeOnSlot( slot ) {
 
 			const { position, angle } = slots[ slot ];

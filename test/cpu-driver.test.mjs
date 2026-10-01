@@ -127,3 +127,28 @@ test( 'state_throughACorner_turnsSmoothly', () => {
 	}
 
 } );
+
+test( 'state_onARamp_followsTheTerrainHeight', () => {
+
+	const terrain = { surfaceAt: () => 'asphalt', heightAt: () => 0.7, normalAt: () => [ 0, 1, 0 ] };
+	const driver_obj = new CpuDriver( { path: buildPath( DEFAULT_TRACK, CELL ), start: 0, lateral: 0, difficulty: DIFFICULTY.medium, terrain } );
+	assert.equal( driver_obj.state().p[ 1 ], 0.5 + 0.7 );
+
+} );
+
+test( 'state_withoutTerrain_staysAtTheOldHeight', () => {
+
+	const driver_obj = new CpuDriver( { path: buildPath( DEFAULT_TRACK, CELL ), start: 0, lateral: 0, difficulty: DIFFICULTY.medium } );
+	assert.equal( driver_obj.state().p[ 1 ], 0.5 );
+
+} );
+
+test( 'targetSpeed_onDirt_isSlowerBySpeedFactor', () => {
+
+	const dirt = { surfaceAt: () => 'dirt', heightAt: () => 0, normalAt: () => [ 0, 1, 0 ] };
+	const path = buildPath( DEFAULT_TRACK, CELL );
+	const onAsphalt = new CpuDriver( { path, start: 0, lateral: 0, difficulty: DIFFICULTY.medium } );
+	const onDirt = new CpuDriver( { path, start: 0, lateral: 0, difficulty: DIFFICULTY.medium, terrain: dirt } );
+	assert.equal( onDirt.targetSpeed(), onAsphalt.targetSpeed() * 0.8 );
+
+} );
