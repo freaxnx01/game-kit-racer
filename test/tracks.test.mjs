@@ -2,8 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESET_TRACKS, trackHref } from '../js/Tracks.js';
-import { decodeCells as decode, isDirt } from '../js/TrackCodec.js';
+import { decodeCells as decode, encodeCells, isDirt } from '../js/TrackCodec.js';
 import { trackOrder } from '../js/race/TrackPath.js';
+import { claypitWithJumps } from '../tools/claypit.mjs';
 
 test( 'presets list the default track, the four Aerodrome Apex tracks and Bad Säckingen', () => {
 
@@ -71,3 +72,22 @@ test( 'claypit_isDirtWithARampATabletopAndWhoopsFacingTheDrivingDirection', () =
 	}
 
 } );
+
+// tools/aerodrome-tracks.mjs regenerates js/Tracks.js from the plain Aerodrome Apex layout and must put the
+// jumps and dirt back — so the plain layout run through claypitWithJumps has to give the shipped map.
+test( 'claypitWithJumps_plainLayout_givesTheShippedClaypit', () => {
+
+	const shipped = PRESET_TRACKS.find( ( t ) => t.id === 'claypit' ).map;
+	const plain = decode( shipped ).map( ( [ gx, gz, type, orient ] ) => [ gx, gz, type === 'track-finish' || type === 'track-corner' ? type : 'track-straight', type === 'track-corner' || type === 'track-finish' ? orient : straightAxis( orient ) ] );
+	const before = JSON.stringify( plain );
+	assert.equal( encodeCells( claypitWithJumps( plain ) ), shipped );
+	assert.equal( JSON.stringify( plain ), before, 'input cells were changed' );
+
+} );
+
+// The rasterizer writes straights as orientation 0 (along z) or 16 (along x); a jump may face either way.
+function straightAxis( orient ) {
+
+	return orient === 10 ? 0 : orient === 22 ? 16 : orient;
+
+}
