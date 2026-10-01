@@ -6,7 +6,7 @@ import { colliderGrid } from './ProfileGeometry.js';
 
 const _debugMat = new THREE.MeshBasicMaterial( { color: 0x00ff00, wireframe: true } );
 
-const COLLIDER_STEPS = 24;
+const COLLIDER_STEPS = 40;
 const ROAD_HALF_WIDTH = 4.75; // raw; the wall line (WALL_X)
 
 // Static triangle mesh of a profile piece's road, in world space (cell centre, orientation, grid scale,
