@@ -3,22 +3,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { probeGridSize, MAX_GROUND_PROBES } from '../js/ProbeGrid.js';
 import { PRESET_TRACKS } from '../js/Tracks.js';
+import { decodeCells } from '../js/TrackCodec.js';
 
 const CELL = 9.99 * 0.75;
 
-// Same byte layout and bounds as decodeCells / computeTrackBounds in js/Track.js (which needs three.js, so not imported here)
+// Same bounds as computeTrackBounds in js/Track.js (which needs three.js, so not imported here)
 function halfExtents( map ) {
 
 	if ( ! map ) return { hw: 30, hd: 30 };
 
-	const bytes = Buffer.from( map.replace( /-/g, '+' ).replace( /_/g, '/' ), 'base64' );
-	const xs = [], zs = [];
-	for ( let i = 0; i + 2 < bytes.length; i += 3 ) {
-
-		xs.push( bytes[ i ] - 128 );
-		zs.push( bytes[ i + 1 ] - 128 );
-
-	}
+	const cells = decodeCells( map );
+	const xs = cells.map( ( c ) => c[ 0 ] );
+	const zs = cells.map( ( c ) => c[ 1 ] );
 
 	return {
 		hw: ( Math.max( ...xs ) - Math.min( ...xs ) + 1 ) / 2 * CELL + CELL,

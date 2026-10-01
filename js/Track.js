@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+export { encodeCells, decodeCells, TYPE_NAMES } from './TrackCodec.js';
+
 export const ORIENT_DEG = { 0: 0, 10: 180, 16: 90, 22: 270 };
 
 export const CELL_RAW = 9.99;
@@ -335,58 +337,6 @@ export function placePiece( models, key, gx, gz, orient ) {
 
 }
 
-// ─── Track Codec ──────────────────────────────────────────
-
-const TYPE_NAMES = [ 'track-straight', 'track-corner', 'track-bump', 'track-finish' ];
-const TYPE_INDEX = {};
-for ( let i = 0; i < TYPE_NAMES.length; i ++ ) TYPE_INDEX[ TYPE_NAMES[ i ] ] = i;
-
-const ORIENT_TO_GODOT = [ 0, 16, 10, 22 ];
-const GODOT_TO_ORIENT = { 0: 0, 16: 1, 10: 2, 22: 3 };
-
-export { TYPE_NAMES };
-
-export function encodeCells( cells ) {
-
-	const bytes = new Uint8Array( cells.length * 3 );
-
-	for ( let i = 0; i < cells.length; i ++ ) {
-
-		const [ gx, gz, name, godotOrient ] = cells[ i ];
-		const ti = TYPE_INDEX[ name ] ?? 0;
-		const oi = GODOT_TO_ORIENT[ godotOrient ] ?? 0;
-
-		bytes[ i * 3 ] = gx + 128;
-		bytes[ i * 3 + 1 ] = gz + 128;
-		bytes[ i * 3 + 2 ] = ( ti << 2 ) | oi;
-
-	}
-
-	return bytesToBase64url( bytes );
-
-}
-
-export function decodeCells( str ) {
-
-	const bytes = base64urlToBytes( str );
-	const cells = [];
-
-	for ( let i = 0; i + 2 < bytes.length; i += 3 ) {
-
-		const gx = bytes[ i ] - 128;
-		const gz = bytes[ i + 1 ] - 128;
-		const packed = bytes[ i + 2 ];
-		const ti = ( packed >> 2 ) & 0x03;
-		const oi = packed & 0x03;
-
-		cells.push( [ gx, gz, TYPE_NAMES[ ti ], ORIENT_TO_GODOT[ oi ] ] );
-
-	}
-
-	return cells;
-
-}
-
 export function computeSpawnPosition( cells ) {
 
 	let cell = cells[ 0 ];
@@ -439,25 +389,5 @@ export function computeTrackBounds( cells ) {
 	const halfDepth = ( maxZ - minZ + 1 ) / 2 * S + S;
 
 	return { centerX, centerZ, halfWidth, halfDepth };
-
-}
-
-function bytesToBase64url( bytes ) {
-
-	let binary = '';
-	for ( let i = 0; i < bytes.length; i ++ ) binary += String.fromCharCode( bytes[ i ] );
-
-	return btoa( binary ).replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=+$/, '' );
-
-}
-
-function base64urlToBytes( str ) {
-
-	const base64 = str.replace( /-/g, '+' ).replace( /_/g, '/' );
-	const binary = atob( base64 );
-	const bytes = new Uint8Array( binary.length );
-	for ( let i = 0; i < binary.length; i ++ ) bytes[ i ] = binary.charCodeAt( i );
-
-	return bytes;
 
 }
