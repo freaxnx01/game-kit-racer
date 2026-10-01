@@ -273,7 +273,7 @@ export class DriftMarks {
 
 	update( dt, vehicle, surface = 'asphalt' ) {
 
-		const drifting = vehicle.driftIntensity > 0.5 && Math.abs( vehicle.linearSpeed ) > 0.15;
+		const drifting = vehicle.driftIntensity > 0.5 && Math.abs( vehicle.linearSpeed ) > 0.15 && ! vehicle.airborne;
 		const groundY = vehicle.container.position.y + Y_OFFSET;
 		const intensity = vehicle.driftIntensity;
 		const onDirt = surface === 'dirt';
