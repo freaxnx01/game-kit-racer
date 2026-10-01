@@ -8,6 +8,7 @@ import { Camera } from './Camera.js';
 import { SpinHold } from './SpinHold.js';
 import { Controls } from './Controls.js';
 import { buildTrack, decodeCells, encodeCells, computeSpawnPosition, computeTrackBounds, addProfileModels, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
+import { makeTerrain } from './Terrain.js';
 import { pieceModelNames } from './Pieces.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
@@ -291,6 +292,9 @@ async function init() {
 	vehicle.rigidBody = sphereBody;
 	vehicle.physicsWorld = world;
 
+	const terrain = makeTerrain( customCells || TRACK_CELLS, CELL_RAW * GRID_SCALE, GRID_SCALE );
+	vehicle.terrain = terrain;
+
 	if ( spawn ) {
 
 		const [ sx, sy, sz ] = spawn.position;
@@ -304,7 +308,7 @@ async function init() {
 	scene.add( vehicleGroup );
 
 	// Playwright checks (&debug only): the running vehicle and physics, never used by the game itself.
-	if ( new URLSearchParams( window.location.search ).has( 'debug' ) ) window.__racerDebug = { vehicle, sphereBody, world };
+	if ( new URLSearchParams( window.location.search ).has( 'debug' ) ) window.__racerDebug = { vehicle, sphereBody, world, terrain };
 
 	dirLight.target = vehicleGroup;
 
@@ -484,6 +488,8 @@ async function init() {
 		opponentContacts.endStep();
 
 		vehicle.update( dt, input );
+
+		if ( vehicle.landing > 2 ) audio.playImpact( vehicle.landing );
 
 		dirLight.position.set(
 			vehicle.spherePos.x + 11.4,

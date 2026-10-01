@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { rigidBody } from 'crashcat';
+import { isAirborne, landingSpeed, airPitch } from './Airtime.js';
 
 const _tmpVec = new THREE.Vector3();
 const _forward = new THREE.Vector3();
@@ -9,6 +10,7 @@ const _newZ = new THREE.Vector3();
 const _mat4 = new THREE.Matrix4();
 const _quat = new THREE.Quaternion();
 const _up = new THREE.Vector3( 0, 1, 0 );
+const _targetUp = new THREE.Vector3();
 
 const SPEED_SCALE = 12.5;
 const LINEAR_DAMP = 0.1;
@@ -52,6 +54,10 @@ export class Vehicle {
 		this.inputZ = 0;
 
 		this.driftIntensity = 0;
+
+		this.terrain = null;     // makeTerrain() result, set by main.js; null = flat everywhere
+		this.airborne = false;
+		this.landing = 0;        // vertical speed of a landing this frame, 0 otherwise
 
 	}
 
@@ -149,7 +155,7 @@ export class Vehicle {
 
 		if ( _tmpVec.y > 0.5 ) {
 
-			const targetQuat = this.alignWithY( this.container.quaternion, _up );
+			const targetQuat = this.alignWithY( this.container.quaternion, this.targetUp() );
 			this.container.quaternion.slerp( targetQuat, 0.2 );
 
 		}
@@ -180,6 +186,8 @@ export class Vehicle {
 
 			const vel = this.rigidBody.motionProperties.linearVelocity;
 			this.sphereVel.set( vel[ 0 ], vel[ 1 ], vel[ 2 ] );
+
+			this.updateAirState();
 
 		}
 
@@ -227,6 +235,36 @@ export class Vehicle {
 
 		this.driftIntensity = Math.abs( this.linearSpeed - this.acceleration ) +
 			( this.bodyNode ? Math.abs( this.bodyNode.rotation.z ) * 2 : 0 );
+
+	}
+
+	// Up vector the truck leans towards: the road's slope on the ground, the flight path in the air.
+	targetUp() {
+
+		if ( ! this.terrain ) return _up;
+
+		if ( ! this.airborne ) {
+
+			const [ nx, ny, nz ] = this.terrain.normalAt( this.spherePos.x, this.spherePos.z );
+			return _targetUp.set( nx, ny, nz );
+
+		}
+
+		const horizontal = Math.hypot( this.sphereVel.x, this.sphereVel.z );
+		const pitch = airPitch( this.sphereVel.y, horizontal );
+		_forward.set( 0, 0, 1 ).applyQuaternion( this.container.quaternion );
+		_forward.y = 0;
+		_forward.normalize();
+		return _targetUp.copy( _up ).multiplyScalar( Math.cos( pitch ) ).addScaledVector( _forward, - Math.sin( pitch ) );
+
+	}
+
+	updateAirState() {
+
+		const ground = this.terrain ? this.terrain.heightAt( this.spherePos.x, this.spherePos.z ) : 0;
+		const airborne = isAirborne( this.spherePos.y, ground );
+		this.landing = landingSpeed( this.airborne, airborne, this.sphereVel.y );
+		this.airborne = airborne;
 
 	}
 
