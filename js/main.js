@@ -7,7 +7,8 @@ import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { SpinHold } from './SpinHold.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, encodeCells, computeSpawnPosition, computeTrackBounds, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
+import { buildTrack, decodeCells, encodeCells, computeSpawnPosition, computeTrackBounds, addProfileModels, TRACK_CELLS, CELL_RAW, GRID_SCALE } from './Track.js';
+import { pieceModelNames } from './Pieces.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { DriftMarks } from './DriftMarks.js';
@@ -92,7 +93,7 @@ const loader = new ColorMapGLTFLoader();
 
 const modelNames = [
 	'vehicle-truck-yellow', 'vehicle-truck-green', 'vehicle-truck-purple', 'vehicle-truck-red',
-	'track-straight', 'track-corner', 'track-bump', 'track-finish',
+	...pieceModelNames(),
 	'decoration-empty', 'decoration-forest', 'decoration-tents',
 ];
 
@@ -192,6 +193,7 @@ async function init() {
 	registerAll();
 	progress.begin( 'models' );
 	await loadModels( ( done, total ) => progress.step( done, total ) );
+	addProfileModels( models );
 
 	const mapParam = new URLSearchParams( window.location.search ).get( 'map' );
 	let customCells = null;
@@ -300,6 +302,9 @@ async function init() {
 
 	const vehicleGroup = vehicle.init( models[ 'vehicle-truck-yellow' ] );
 	scene.add( vehicleGroup );
+
+	// Playwright checks (&debug only): the running vehicle and physics, never used by the game itself.
+	if ( new URLSearchParams( window.location.search ).has( 'debug' ) ) window.__racerDebug = { vehicle, sphereBody, world };
 
 	dirLight.target = vehicleGroup;
 

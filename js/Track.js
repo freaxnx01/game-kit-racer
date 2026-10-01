@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { PIECES, profileOf } from './Pieces.js';
+import { sliceAlongZ, liftByProfile, evenCuts } from './ProfileGeometry.js';
 
 export { encodeCells, decodeCells, TYPE_NAMES } from './TrackCodec.js';
 
@@ -7,7 +9,32 @@ export const ORIENT_DEG = { 0: 0, 10: 180, 16: 90, 22: 270 };
 export const CELL_RAW = 9.99;
 export const GRID_SCALE = 0.75;
 
+const PROFILE_STEPS = 40; // bands along a profile piece; 40 keeps the ramp lip (5% of the cell) sharp
+
 const _dummy = new THREE.Object3D();
+
+// Profile pieces (ramp, tabletop, whoops) are the straight piece sliced into bands along z and lifted by
+// their height profile — same kerbs, markings and walls, just not flat. Added to `models` like a GLB.
+export function addProfileModels( models ) {
+
+	const straight = models[ 'track-straight' ];
+	if ( ! straight?.isMesh ) throw new Error( 'track-straight must load as a single mesh' );
+
+	const flat = straight.geometry.toNonIndexed();
+	const sliced = sliceAlongZ( flat.attributes.position.array, flat.attributes.uv.array, evenCuts( CELL_RAW / 2, PROFILE_STEPS ) );
+
+	for ( const [ type, piece ] of Object.entries( PIECES ) ) {
+
+		if ( ! piece.profile ) continue;
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( liftByProfile( sliced.positions, profileOf( type ), CELL_RAW / 2 ), 3 ) );
+		geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( sliced.uvs, 2 ) );
+		geometry.computeVertexNormals();
+		models[ type ] = new THREE.Mesh( geometry, straight.material );
+
+	}
+
+}
 
 export const TRACK_CELLS = [
 	[ -3, -3, 'track-corner',   16 ],

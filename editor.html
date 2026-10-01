@@ -160,8 +160,9 @@
 
 	<script type="module">
 	import * as THREE from 'three';
-	import { ORIENT_DEG, CELL_RAW, GRID_SCALE, encodeCells, decodeCells } from './js/Track.js';
+	import { ORIENT_DEG, CELL_RAW, GRID_SCALE, encodeCells, decodeCells, addProfileModels } from './js/Track.js';
 	import { ColorMapGLTFLoader } from './js/Loader.js';
+	import { pieceModelNames } from './js/Pieces.js';
 
 	// ─── Auto-tile lookup ─────────────────────────────────────
 	// Bitmask: N=8 S=4 E=2 W=1
@@ -310,7 +311,7 @@
 
 	const loader = new ColorMapGLTFLoader();
 
-	const modelNames = [ 'track-straight', 'track-corner', 'track-bump', 'track-finish' ];
+	const modelNames = pieceModelNames();
 	const models = {};
 
 	async function loadModels() {
@@ -1243,6 +1244,9 @@
 	// ─── Init & render loop ───────────────────────────────────
 
 	await loadModels();
+	const profileModels = { 'track-straight': models[ 'track-straight' ].getObjectByProperty( 'isMesh', true ) };
+	addProfileModels( profileModels );
+	for ( const [ type, mesh ] of Object.entries( profileModels ) ) if ( type !== 'track-straight' ) models[ type ] = mesh;
 	loadSaved();
 
 	// Start with a finish cell if the grid is empty
