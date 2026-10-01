@@ -133,17 +133,21 @@ const RING_INNER = 0.5, RING_OUTER = 9.5; // corner asphalt around the arc centr
 
 // Brown overlay for a dirt cell, as a triangle soup in the piece's local raw units. 'straight' covers
 // every straight-like piece (lifted by its profile, if any); 'corner' is the quarter ring of a corner.
+// Corner angle runs opposite to z, so its winding is reversed relative to straight; reverse again to face up.
 export function dirtPatch( shape, profile, steps ) {
 
 	const quad = shape === 'corner' ? cornerQuad : straightQuad;
 	const out = { positions: [], uvs: [] };
+	const order = shape === 'corner' ? [ 0, 1, 2, 1, 3, 2 ] : [ 0, 2, 1, 1, 2, 3 ]; // indices into [a, b, c, d]
 
 	for ( let i = 0; i < steps; i ++ ) {
 
 		const a = quad( i / steps, 0, profile ), b = quad( i / steps, 1, profile );
 		const c = quad( ( i + 1 ) / steps, 0, profile ), d = quad( ( i + 1 ) / steps, 1, profile );
-		for ( const v of [ a, c, b, b, c, d ] ) {
+		const verts = [ a, b, c, d ];
+		for ( const idx of order ) {
 
+			const v = verts[ idx ];
 			out.positions.push( v[ 0 ], v[ 1 ], v[ 2 ] );
 			out.uvs.push( v[ 0 ] / 4, v[ 2 ] / 4 );
 

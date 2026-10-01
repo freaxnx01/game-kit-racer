@@ -114,3 +114,25 @@ test( 'dirtPatch_corner_isAQuarterRingAroundTheArcCentre', () => {
 	}
 
 } );
+
+test( 'dirtPatch_bothShapes_everyTriangleFacesUp', () => {
+
+	for ( const shape of [ 'straight', 'corner' ] ) {
+
+		const { positions } = dirtPatch( shape, null, 8 );
+		for ( let i = 0; i < positions.length; i += 9 ) {
+
+			const [ a, b, c ] = [
+				[ positions[ i ], positions[ i + 1 ], positions[ i + 2 ] ],
+				[ positions[ i + 3 ], positions[ i + 4 ], positions[ i + 5 ] ],
+				[ positions[ i + 6 ], positions[ i + 7 ], positions[ i + 8 ] ],
+			];
+			const ux = b[ 0 ] - a[ 0 ], uz = b[ 2 ] - a[ 2 ];
+			const vx = c[ 0 ] - a[ 0 ], vz = c[ 2 ] - a[ 2 ];
+			assert.ok( uz * vx - ux * vz > 0, `${ shape } triangle ${ i / 9 } must face up (cross product y=${ uz * vx - ux * vz })` );
+
+		}
+
+	}
+
+} );
