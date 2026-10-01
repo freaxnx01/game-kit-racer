@@ -8,6 +8,23 @@ All notable changes to this project are documented here, following
 
 ### Added
 
+- New track pieces: **ramp**, **tabletop** and **whoops** — with real jumps. Hit
+  the ramp at speed and the truck flies; the whoops shake it about.
+- Any piece can now be **dirt**: less grip, more sliding, lower top speed, brown
+  dust and dirt tracks behind you.
+- The editor has two new tools: **Element** (4) turns a straight into a ramp,
+  tabletop or whoops — Shift+click flips its direction — and **Dirt** (5)
+  paints dirt onto the road.
+
+### Changed
+
+- **The Claypit** is now a real dirt rallycross track with a ramp, a tabletop
+  and whoops.
+
+## [0.2.0] - 2026-09-29
+
+### Added
+
 - Ghost: after your first full lap, a see-through truck replays your fastest
   lap on that track, in step with the lap timer — race it to beat your best.
   It is saved per track, so it is waiting for you next time.
@@ -37,20 +54,12 @@ All notable changes to this project are documented here, following
   percent. **Cancel** takes you back to the track you came from; while the real
   houses of an OpenStreetMap track are still loading, it skips them and you drive
   on without. Available in German and English.
-- New track pieces: **ramp**, **tabletop** and **whoops** — with real jumps. Hit
-  the ramp at speed and the truck flies; the whoops shake it about.
-- Any piece can now be **dirt**: less grip, more sliding, lower top speed, brown
-  dust and dirt tracks behind you.
-- The editor has two new tools: **Element** (4) turns a straight into a ramp,
-  tabletop or whoops — Shift+click flips its direction — and **Dirt** (5)
-  paints dirt onto the road.
+- Fullscreen toggle (⛶) in the game navigation
 
 ### Changed
 
 - Donuts: when you spin the truck on the spot, the camera now holds still instead
   of swinging back and forth. It picks up following you again as soon as you drive off.
-- **The Claypit** is now a real dirt rallycross track with a ramp, a tabletop
-  and whoops.
 
 ### Fixed
 
