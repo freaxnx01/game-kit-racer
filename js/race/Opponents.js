@@ -6,7 +6,10 @@ import { rigidBody, sphere, MotionType } from 'crashcat';
 import { pushState, sampleBuffer, RENDER_DELAY_MS } from './Interpolate.js';
 import { isTeleport } from './Bump.js';
 
-const TRUCKS = [ 'vehicle-truck-green', 'vehicle-truck-purple', 'vehicle-truck-red' ];
+// CPU races: you drive yellow, the CPUs the other three. Multiplayer: one colour per grid slot on every
+// screen, your own truck included (main.js paints it), so a player looks the same to everyone.
+export const CPU_TRUCKS = [ 'vehicle-truck-green', 'vehicle-truck-purple', 'vehicle-truck-red' ];
+export const SLOT_TRUCKS = [ 'vehicle-truck-yellow', ...CPU_TRUCKS ];
 const SPHERE_RADIUS = 0.5;  // same as the player's body (Physics.js createSphereBody)
 const MODEL_OFFSET_Y = 0.5; // Vehicle.js puts the model half a unit below the sphere centre
 const HIDDEN = [ 0, - 100, 0 ];
@@ -37,22 +40,24 @@ function nameSprite( name ) {
 
 export class Opponents {
 
-	// models: the loaded GLB scenes by name (main.js `models`); world: the crashcat world.
-	constructor( scene, world, models ) {
+	// models: the loaded GLB scenes by name (main.js `models`); world: the crashcat world;
+	// trucks: model names that add()'s index picks from.
+	constructor( scene, world, models, trucks = CPU_TRUCKS ) {
 
 		this.scene = scene;
 		this.world = world;
 		this.models = models;
+		this.truckNames = trucks;
 		this.trucks = new Map(); // id → { group, body, buffer }
 
 	}
 
-	// index picks the truck colour (0–2); re-adding an id replaces it.
+	// index picks the truck colour from `trucks`; re-adding an id replaces it.
 	add( id, name, index ) {
 
 		this.remove( id );
 		const group = new THREE.Group();
-		const src = this.models[ TRUCKS[ index % TRUCKS.length ] ];
+		const src = this.models[ this.truckNames[ index % this.truckNames.length ] ];
 		if ( src ) group.add( src.clone() );
 		group.add( nameSprite( name ) );
 		group.visible = false;
