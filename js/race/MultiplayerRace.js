@@ -462,9 +462,11 @@ export class MultiplayerRace {
 
 	}
 
+	// In every phase, lobby included, so everyone sees the others' trucks as soon as they are connected.
+	// A guest waits for the roster: until then it has no id the host would accept.
 	tickState( now ) {
 
-		if ( this.phase !== PHASE.COUNTDOWN && this.phase !== PHASE.RACING ) return;
+		if ( ! this.you ) return;
 		if ( now - this.lastState < STATE_INTERVAL_MS ) return;
 		this.lastState = now;
 

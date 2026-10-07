@@ -338,8 +338,9 @@ async function init() {
 
 	function updateGhost() {
 
-		// persist === false only while a multiplayer race (#1) runs: no ghost there, and race laps are not recorded.
-		const soloLap = lapTimer.enabled && lapTimer.running && lapTimer.persist !== false;
+		// No ghost in a multiplayer session (#1), lobby included — it would pass for another player's truck.
+		// persist === false while a multiplayer race runs: race laps are not recorded.
+		const soloLap = lapTimer.enabled && lapTimer.running && lapTimer.persist !== false && ! multiplayer.role;
 		if ( ! soloLap ) {
 
 			ghostRun.discard();
