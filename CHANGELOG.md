@@ -21,6 +21,14 @@ All notable changes to this project are documented here, following
 - **The Claypit** is now a real dirt rallycross track with a ramp, a tabletop
   and whoops.
 
+### Fixed
+
+- Multiplayer: the other players' trucks now show up on the track as soon as
+  they have joined, so you can drive around together in the lobby — not only
+  once the race has started.
+- Multiplayer: your ghost no longer drives along while you are in a multiplayer
+  session, so it can't be mistaken for another player.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added

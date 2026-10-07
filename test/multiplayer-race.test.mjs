@@ -226,3 +226,27 @@ test( 'guestReportsLapsRightAfterGo_hostStillWins', async () => {
 	assert.equal( t.mp.view().positions[ 0 ].name, 'Ana' );
 
 } );
+
+test( 'lobby_hostWithGuest_broadcastsOwnStateSoTheGuestSeesTheTruck', async () => {
+
+	const t = await hostWithGuest();
+	t.tick( 50 );
+	const state = t.session().sent.findLast( ( s ) => s.msg.type === 'state' );
+	assert.equal( t.mp.view().phase, 'lobby' );
+	assert.deepEqual( [ state?.to, state?.msg.id ], [ 'g1', 'h' ] );
+
+} );
+
+test( 'lobby_guestBeforeRoster_sendsNoState_afterRosterSendsItsOwn', async () => {
+
+	const t = setup();
+	await t.mp.join( 'KR1.offer-g1', 'Bo' );
+	t.session().connect( 'h' );
+	t.tick( 50 );
+	assert.equal( t.session().sent.some( ( s ) => s.msg.type === 'state' ), false );
+	t.session().deliver( 'h', { type: 'roster', you: 'g1', players: [ { id: 'h', name: 'Ana', slot: 0, connected: true }, { id: 'g1', name: 'Bo', slot: 1, connected: true } ] } );
+	t.tick( 50 );
+	const state = t.session().sent.findLast( ( s ) => s.msg.type === 'state' );
+	assert.deepEqual( [ state?.to, state?.msg.id ], [ 'h', 'g1' ] );
+
+} );
