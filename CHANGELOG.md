@@ -23,6 +23,9 @@ All notable changes to this project are documented here, following
 
 ### Fixed
 
+- Multiplayer: every player has the same truck colour on every screen — yellow,
+  green, purple, red by starting position. Your own truck takes your colour for
+  the session and turns yellow again when you leave.
 - Multiplayer: the other players' trucks now show up on the track as soon as
   they have joined, so you can drive around together in the lobby — not only
   once the race has started.

@@ -42,6 +42,7 @@ function setup() {
 		lapTimer: { onLap: null, resetForRace() {}, startRace() { this.started = true; }, resetForSolo() { this.solo = ( this.solo ?? 0 ) + 1; }, progress: () => 0.5 },
 		opponents: { trucks: new Map(), add( id, name ) { this.trucks.set( id, name ); }, remove( id ) { this.trucks.delete( id ); }, clear() { this.trucks.clear(); }, push() {}, update() {} },
 		placeOnSlot( slot ) { this.slot = slot; }, setHold( hold ) { this.hold = hold; },
+		paintOwnTruck( slot ) { this.paint = slot; }, unpaintOwnTruck() { this.paint = 'solo'; },
 		localState: () => ( { p: [ 1, 0.5, 1 ], q: [ 0, 0, 0, 1 ], v: [ 0, 0, 0 ] } ),
 	};
 	const mp = new MultiplayerRace( game, { onChange: ( v ) => views.push( v ), now: () => time, SessionImpl: FakeSession } );
@@ -248,5 +249,25 @@ test( 'lobby_guestBeforeRoster_sendsNoState_afterRosterSendsItsOwn', async () =>
 	t.tick( 50 );
 	const state = t.session().sent.findLast( ( s ) => s.msg.type === 'state' );
 	assert.deepEqual( [ state?.to, state?.msg.id ], [ 'h', 'g1' ] );
+
+} );
+
+test( 'host_paintsOwnTruckInSlotZeroColour_leaveRestoresSolo', () => {
+
+	const t = setup();
+	t.mp.host( 'Ana', 1 );
+	assert.equal( t.game.paint, 0 );
+	t.mp.leave();
+	assert.equal( t.game.paint, 'solo' );
+
+} );
+
+test( 'guestRoster_paintsOwnTruckInItsSlotColour', async () => {
+
+	const t = setup();
+	await t.mp.join( 'KR1.offer-g1', 'Bo' );
+	t.session().connect( 'h' );
+	t.session().deliver( 'h', { type: 'roster', you: 'g1', players: [ { id: 'h', name: 'Ana', slot: 0, connected: true }, { id: 'g1', name: 'Bo', slot: 2, connected: true } ] } );
+	assert.equal( t.game.paint, 2 );
 
 } );
