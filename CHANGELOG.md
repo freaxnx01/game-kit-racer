@@ -15,6 +15,7 @@ All notable changes to this project are documented here, following
 - The editor has two new tools: **Element** (4) turns a straight into a ramp,
   tabletop or whoops — Shift+click flips its direction — and **Dirt** (5)
   paints dirt onto the road.
+- Hover over the version number to see when the game was last updated, in your own time zone, and how long ago
 
 ### Changed
 
