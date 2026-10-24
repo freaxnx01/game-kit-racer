@@ -24,7 +24,7 @@ import { loadSurroundings, VIEW_MARGIN_CELLS } from './OsmScene.js';
 import { GhostRun, ghostStorageKey, loadGhost, saveGhost } from './race/Ghost.js';
 import { GhostCar } from './race/GhostCar.js';
 import { gridSlots } from './race/RaceState.js';
-import { Opponents } from './race/Opponents.js';
+import { Opponents, SLOT_TRUCKS } from './race/Opponents.js';
 import { MultiplayerRace } from './race/MultiplayerRace.js';
 import { Lobby } from './ui/Lobby.js';
 import { parseInviteHash } from './net/Signal.js';
@@ -390,7 +390,7 @@ async function init() {
 		mapParam: mapParam || encodeCells( TRACK_CELLS ),
 		osmParam: osmRaw && /^[-0-9.,]{13,120}$/.test( osmRaw ) ? osmRaw : null,
 		lapTimer,
-		opponents: new Opponents( scene, world, models ),
+		opponents: new Opponents( scene, world, models, SLOT_TRUCKS ),
 		terrain,
 		placeOnSlot( slot ) {
 
@@ -410,6 +410,16 @@ async function init() {
 		setHold( hold ) {
 
 			holdInput = hold;
+
+		},
+		paintOwnTruck( slot ) {
+
+			vehicle.paint( models[ SLOT_TRUCKS[ slot ] ] );
+
+		},
+		unpaintOwnTruck() {
+
+			vehicle.paint( models[ 'vehicle-truck-yellow' ] );
 
 		},
 		localState() {

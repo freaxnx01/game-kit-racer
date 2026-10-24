@@ -7,6 +7,7 @@
 //   lapTimer: { onLap, resetForRace(), startRace(), resetForSolo(), progress() },
 //   opponents: { trucks: Map, add( id, name, index ), remove( id ), clear(), push( id, state, now ), update( dt, now ) },
 //   placeOnSlot( slot ), setHold( hold ), localState() → { p, q, v },
+//   paintOwnTruck( slot ), unpaintOwnTruck(),   // slot colour while in a session, so every screen agrees
 // }
 
 import { Session } from '../net/Session.js';
@@ -51,7 +52,7 @@ export class MultiplayerRace {
 		this.teardown( 'host' );
 		this.you = 'h';
 		this.race = new RaceState( { cellCount: this.game.trackCells.length, cellSize: this.game.cellSize, laps } );
-		this.race.addPlayer( 'h', name );
+		this.game.paintOwnTruck( this.race.addPlayer( 'h', name ) );
 		this.laps = laps;
 		this.session = this.newSession();
 		this.changed();
@@ -225,6 +226,7 @@ export class MultiplayerRace {
 
 		this.session?.closeAll();
 		this.game.opponents.clear();
+		this.game.unpaintOwnTruck();
 		this.game.setHold( false );
 		this.game.lapTimer.resetForSolo();
 		this.role = role;
@@ -360,6 +362,7 @@ export class MultiplayerRace {
 			case 'roster':
 				this.you = msg.you;
 				this.roster = msg.players;
+				this.syncOwnTruck();
 				this.syncOpponents();
 				return this.changed();
 
@@ -408,6 +411,13 @@ export class MultiplayerRace {
 		this.leave();
 		this.hostTrack = link;
 		this.say( 'mp.otherTrack' );
+
+	}
+
+	syncOwnTruck() {
+
+		const me = this.roster.find( ( p ) => p.id === this.you );
+		if ( me ) this.game.paintOwnTruck( me.slot );
 
 	}
 

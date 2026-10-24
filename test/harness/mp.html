@@ -27,6 +27,7 @@ const opponents = {
 const game = {
 	trackCells, cellSize: 9.99 * 0.75, pageUrl: location.href, mapParam: 'fYYNfoYBf4YB', osmParam: null, lapTimer, opponents,
 	placeOnSlot( slot ) { window.slot = slot; }, setHold( hold ) { window.hold = hold; },
+	paintOwnTruck( slot ) { window.paint = slot; }, unpaintOwnTruck() { window.paint = 'solo'; },
 	localState() { return { p: [ 10, 0.5, 5 ], q: [ 0, 0, 0, 1 ], v: [ 1, 0, 0 ] }; },
 };
 

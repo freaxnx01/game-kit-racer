@@ -104,6 +104,20 @@ export class Vehicle {
 
 	}
 
+	// Repaints the truck as another truck model (the colours differ only in UVs into the shared colormap):
+	// each mesh takes the geometry of the mesh with the same name in model.
+	paint( model ) {
+
+		const geometries = new Map();
+		model.traverse( ( child ) => { if ( child.isMesh ) geometries.set( child.name, child.geometry ); } );
+		this.container.traverse( ( child ) => {
+
+			if ( child.isMesh && geometries.has( child.name ) ) child.geometry = geometries.get( child.name );
+
+		} );
+
+	}
+
 	update( dt, controlsInput ) {
 
 		this.surface = this.terrain ? this.terrain.surfaceAt( this.spherePos.x, this.spherePos.z ) : 'asphalt';
