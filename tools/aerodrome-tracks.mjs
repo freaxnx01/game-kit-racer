@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { simplifyPolyline, rasterizeLoop, loopToTrackCells, encodeTrackCells } from '../js/OsmTrack.js';
 import { claypitWithJumps } from './claypit.mjs';
 
-const SOURCE = process.argv[ 2 ] ?? 'https://github.freaxnx01.ch/game-aerodrome-apex/';
+const SOURCE = process.argv[ 2 ] ?? 'https://aerodrome-apex.freax.games/';
 const UNITS_PER_CELL = 100; // road width is 110–130 units, so one tile ≈ one road width
 const MODE = 'L';
 

@@ -55,8 +55,8 @@ test( 'isOfferExpired_afterTenMinutes_isTrue', () => {
 
 test( 'buildInviteLink_pageWithMapAndOsm_keepsQueryAndSetsHash', () => {
 
-	const link = buildInviteLink( 'https://github.freaxnx01.ch/game-kit-racer/index.html?map=abc&osm=1,2,3,4,10,0,0#old', 'KR1.xyz' );
-	assert.equal( link, 'https://github.freaxnx01.ch/game-kit-racer/index.html?map=abc&osm=1,2,3,4,10,0,0#join=KR1.xyz' );
+	const link = buildInviteLink( 'https://kit-racer.freax.games/index.html?map=abc&osm=1,2,3,4,10,0,0#old', 'KR1.xyz' );
+	assert.equal( link, 'https://kit-racer.freax.games/index.html?map=abc&osm=1,2,3,4,10,0,0#join=KR1.xyz' );
 	assert.equal( parseInviteHash( new URL( link ).hash ), 'KR1.xyz' );
 
 } );
